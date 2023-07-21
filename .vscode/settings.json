@@ -1,0 +1,9 @@
+{
+    "editor.fontSize": 12,
+    "terminal.integrated.fontSize": 12,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+      },
+      "github.copilot.advanced": {}
+}
