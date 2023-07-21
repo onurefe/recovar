@@ -475,7 +475,7 @@ class KFoldTester:
             monitoring_result = monitoring_model.predict(predict_gen)
 
             # Get test dataframe used through monitoring process.
-            __, __, test_df = self.test_environment.get_dfs(split_idx)
+            __, __, test_df = self.test_environment.get_split_metadata(split_idx)
 
             # Save test dataframe to results folder.
             test_df.to_csv(self._get_traces_csv_path(exp_name, split_idx))
