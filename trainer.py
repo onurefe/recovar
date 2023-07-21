@@ -1,13 +1,5 @@
-from config import TRAINED_MODELS_DIR, STEAD_TIME_WINDOW, INSTANCE_TIME_WINDOW
-
+from config import TRAINED_MODELS_DIR
 from kfold_environment import KFoldEnvironment
-
-from detector_models import (
-    AutocovarianceDetector30s,
-    AutocovarianceDetectorDenoising30s,
-    AutocovarianceDetectorDenoisingRealisticNoise30s,
-    Ensemble5CrossCovarianceDetector30s,
-)
 from os.path import join
 from os import makedirs
 import pandas as pd

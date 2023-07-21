@@ -1,5 +1,4 @@
 from config import BATCH_SIZE
-from layers import CrossCovarianceCircular
 import tensorflow as tf
 from tensorflow import keras
 from building_blocks import AutoencoderBlock30s, distance, latent_distance
@@ -199,8 +198,6 @@ class Ensemble5CrossCovarianceDetector30s(keras.Model):
         self.autoencoder3 = AutoencoderBlock30s("autoencoder3")
         self.autoencoder4 = AutoencoderBlock30s("autoencoder4")
         self.autoencoder5 = AutoencoderBlock30s("autoencoder5")
-
-        self.cc = CrossCorrelateVectorsCircular()
 
         self.projector1 = tf.Variable(
             initial_value=tf.keras.initializers.GlorotNormal()(shape=(64, 64)),
