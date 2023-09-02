@@ -1,3 +1,6 @@
 ## Core latex/pdflatex auxiliary files:
 *.pyc
+evals/*
+evals_low_snr/*
+results/*
 trained_models

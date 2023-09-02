@@ -38,6 +38,7 @@ N_CHANNELS = 3
 HOME_DIR = "."
 TRAINED_MODELS_DIR = f"{HOME_DIR}/trained_models"
 MONITORING_DIR = f"{HOME_DIR}/monitoring"
+RESULTS_DIR = f"{HOME_DIR}/results"
 
 # The path of the hdf5 file for the STEAD dataset that contains the waveforms of the events.
 STEAD_WAVEFORMS_HDF5_PATH = "/home/onur/stead/waveforms.hdf5"

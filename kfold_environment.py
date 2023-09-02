@@ -178,6 +178,7 @@ class KFoldEnvironment:
         ]
 
         # Saves the chunk dataframes.
+        makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
         metadata_path = join(
             self.preprocessed_dataset_directory, self.dataset, "metadata.csv"
         )

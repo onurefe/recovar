@@ -1,12 +1,18 @@
 from config import BATCH_SIZE
-from layers import Downsample, Upsample, ResIdentity, Conv, Padding
+from layers import (
+    Downsample,
+    Upsample,
+    UpsampleNoactivation,
+    ResIdentity,
+    Padding,
+)
 import tensorflow as tf
 from tensorflow import keras
 
 
-def normalize(x, axis):
+def normalize(x, axis, eps=1e-8):
     norm = tf.sqrt(tf.reduce_sum(tf.square(x), axis=axis, keepdims=True))
-    return x / (1e-37 + norm)
+    return x / (eps + norm)
 
 
 def demean(x, axis=1):
@@ -24,22 +30,24 @@ def distance(x, y):
 def latent_distance(x, y):
     x = demean(x, axis=1)
     y = demean(y, axis=1)
+
     x = normalize(x, axis=1)
     y = normalize(y, axis=1)
+
     distance = tf.sqrt(tf.reduce_sum(tf.square(x - y), axis=[1, 2]))
     return distance
 
 
 @tf.keras.utils.register_keras_serializable()
-class AutoencoderBlock30s(keras.Model):
+class AutoencoderBlock(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
-    def __init__(self, name="autoencoder_block_30s", *args, **kwargs):
-        super(AutoencoderBlock30s, self).__init__(name=name, **kwargs)
+    def __init__(self, name="autoencoder_block", *args, **kwargs):
+        super(AutoencoderBlock, self).__init__(name=name, **kwargs)
 
     def get_config(self):
-        config = super(AutoencoderBlock30s, self).get_config()
+        config = super(AutoencoderBlock, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
@@ -65,7 +73,8 @@ class AutoencoderBlock30s(keras.Model):
         self.up3 = Upsample(8, 11, name="up_3")  # 376 -> 752
         self.crop1 = tf.keras.layers.Cropping1D(cropping=(1, 1))  # 752 -> 750
         self.up4 = Upsample(4, 13, name="up_4")  # 750 -> 1500
-        self.up5 = Upsample(3, 15, name="up_5")  # 1500 -> 3000
+        self.up5 = UpsampleNoactivation(3, 15, name="up_5")
+        # self.up5 = Upsample(3, 15, name="up_5")  # 1500 -> 3000
 
     def _encoder(self, x, training):
         x = self.down1(x, training=training)

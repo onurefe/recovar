@@ -101,7 +101,7 @@ class BatchGenerator:
         )
 
         # Parse metadata.
-        self.waveforms = self.get_waveforms(batch_metadata)
+        self.waveforms = self._get_waveforms(batch_metadata)
 
         f_eq = h5py.File(self.eq_hdf5_path, "r")
         self.data_pick = f_eq.get("data/")
@@ -157,7 +157,7 @@ class BatchGenerator:
             waveform = {}
             if row["label"] == "eq":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["receiver_code"]
+                waveform["station_name"] = row["station_name"]
                 waveform["trace_start_time"] = self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -168,7 +168,7 @@ class BatchGenerator:
 
             if row["label"] == "no":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["receiver_code"]
+                waveform["station_name"] = row["station_name"]
                 waveform["trace_start_time"]: self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -436,7 +436,7 @@ class DataGenerator(Sequence):
             for chunk_idx in range(len(self.chunk_metadata_list)):
                 bg = BatchGenerator(
                     batch_size=self.batch_size,
-                    df=self.chunk_metadata_list[chunk_idx],
+                    batch_metadata=self.chunk_metadata_list[chunk_idx],
                     eq_hdf5_path=self.bg_kwargs["eq_hdf5_path"],
                     no_hdf5_path=self.bg_kwargs["no_hdf5_path"],
                     meta_parser=self.bg_kwargs["meta_parser"],
