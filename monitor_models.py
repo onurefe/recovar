@@ -217,7 +217,7 @@ class Autocovariance(keras.Model):
 
         f, y = self.model(x, training=training)
 
-        f = demean(f, axis=1)
+        f = f - tf.reduce_mean(f, axis=1)
 
         monitor = {}
 
@@ -498,7 +498,7 @@ class RepresentationEnsembleCrossCovariances(keras.Model):
         config = super(RepresentationEnsembleCrossCovariances, self).get_config()
         return config
 
-    def build(self, input_shape=None):  # Create the state of the layer (weights)
+    def build(self, input_shape=None):
         self.cc = CrossCovarianceCircular()
 
     def call(self, inputs, training=False):

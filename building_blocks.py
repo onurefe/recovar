@@ -9,35 +9,6 @@ from layers import (
 import tensorflow as tf
 from tensorflow import keras
 
-
-def normalize(x, axis, eps=1e-8):
-    norm = tf.sqrt(tf.reduce_sum(tf.square(x), axis=axis, keepdims=True))
-    return x / (eps + norm)
-
-
-def demean(x, axis=1):
-    return x - tf.reduce_mean(x, axis=axis, keepdims=True)
-
-
-def distance(x, y):
-    x = demean(x, axis=1)
-    y = demean(y, axis=1)
-
-    distance = tf.sqrt(tf.reduce_mean(tf.square(x - y), axis=[1, 2]))
-    return distance
-
-
-def latent_distance(x, y):
-    x = demean(x, axis=1)
-    y = demean(y, axis=1)
-
-    x = normalize(x, axis=1)
-    y = normalize(y, axis=1)
-
-    distance = tf.sqrt(tf.reduce_sum(tf.square(x - y), axis=[1, 2]))
-    return distance
-
-
 @tf.keras.utils.register_keras_serializable()
 class AutoencoderBlock(keras.Model):
     N_TIMESTEPS = 3000
@@ -74,7 +45,6 @@ class AutoencoderBlock(keras.Model):
         self.crop1 = tf.keras.layers.Cropping1D(cropping=(1, 1))  # 752 -> 750
         self.up4 = Upsample(4, 13, name="up_4")  # 750 -> 1500
         self.up5 = UpsampleNoactivation(3, 15, name="up_5")
-        # self.up5 = Upsample(3, 15, name="up_5")  # 1500 -> 3000
 
     def _encoder(self, x, training):
         x = self.down1(x, training=training)

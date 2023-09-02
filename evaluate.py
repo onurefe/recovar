@@ -1,4 +1,3 @@
-from config import MONITORING_DIR
 import pandas as pd
 import numpy as np
 import h5py as h5
@@ -196,18 +195,18 @@ class Evaluate:
         return monitoring_meta, monitoring_data
 
     def _are_monitoring_files_present(self):
-        return exists(self._get_monitoring_data_file_path()) and exists(
-            self._get_monitoring_meta_file_path()
+        return exists(self.tester.get_monitoring_data_file_path()) and exists(
+            self.tester.get_monitoring_meta_file_path()
         )
 
     def _read_monitoring_meta(self):
-        return pd.read_csv(self._get_monitoring_meta_file_path())
+        return pd.read_csv(self.tester.get_monitoring_meta_file_path())
 
     def _read_monitoring_data(
         self,
     ):
         f = h5.File(
-            self._get_monitor_file_path(),
+            self.tester.get_monitoring_data_file_path(),
             "r",
         )
 
@@ -220,7 +219,7 @@ class Evaluate:
         return monitoring_data
 
     def _monitor(self):
-        tester.test(
+        self.tester.test(
             exp_name=self._exp_name,
             splits=self._split_idx,
             monitored_params=self._monitored_param_list,
@@ -232,12 +231,10 @@ class Evaluate:
     ):
         train_kenv = KFoldEnvironment(
             dataset=train_dataset,
-            subsampling_factor=1.0,
         )
 
         test_kenv = KFoldEnvironment(
             dataset=test_dataset,
-            subsampling_factor=1.0,
         )
 
         self.tester = KFoldTester(

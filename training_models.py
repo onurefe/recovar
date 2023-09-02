@@ -2,12 +2,7 @@ from config import BATCH_SIZE
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-
-from building_blocks import (
-    AutoencoderBlock,
-    distance,
-    latent_distance,
-)
+from building_blocks import AutoencoderBlock
 
 
 @tf.keras.utils.register_keras_serializable()

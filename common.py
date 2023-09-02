@@ -79,7 +79,6 @@ def gaussian(x, mu, sig, axis=1):
     g = np.exp(-np.power(x - mu, 2.0) / (2 * np.power(sig, 2.0)))
     return g / np.sum(g, axis=axis, keepdims=True)
 
-
 def detector(detection_vector, detection_vector_name):
     if detection_vector_name == "xcov" or detection_vector_name == "ycov":
         window_size = 5.0
