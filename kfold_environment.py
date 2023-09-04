@@ -12,13 +12,15 @@ from config import (
     PHASE_PICK_ENSURED_CROP_RATIO,
     PHASE_ENSURING_MARGIN,
 )
-from directory import (STEAD_WAVEFORMS_HDF5_PATH,
+from directory import (
+    STEAD_WAVEFORMS_HDF5_PATH,
     STEAD_METADATA_CSV_PATH,
     INSTANCE_EQ_WAVEFORMS_HDF5_PATH,
     INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
-    PREPROCESSED_DATASET_DIRECTORY)
+    PREPROCESSED_DATASET_DIRECTORY,
+)
 
 from data_generator import (
     DataGenerator,
@@ -390,8 +392,8 @@ class KFoldEnvironment:
         metadata["source_id"] = metadata["source_id"].astype(str)
         metadata.rename({"receiver_code": "station_name"})
 
-        eq_metadata = metadata[metadata.trace_category == "earthquake_local"]
-        no_metadata = metadata[metadata.trace_category == "noise"]
+        eq_metadata = metadata[metadata.trace_category == "earthquake_local"].copy()
+        no_metadata = metadata[metadata.trace_category == "noise"].copy()
 
         # You need to merge eq and no samples to form chunks. Because of that you
         # need to put a column named source_id to noise waveforms. Since
@@ -399,8 +401,8 @@ class KFoldEnvironment:
         no_metadata["source_id"] = no_metadata["trace_name"]
 
         # Label samples.
-        eq_metadata["label"] = "eq"
-        no_metadata["label"] = "no"
+        eq_metadata.loc[:, "label"] = "eq"
+        no_metadata.loc[:, "label"] = "no"
 
         standardized_metadata = pd.concat([eq_metadata, no_metadata])
 

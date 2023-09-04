@@ -1,17 +1,32 @@
-from training_models import (
-    AutocovarianceDetector30s,
-    AutocovarianceDetectorDenoising30s,
-    Ensemble5CrossCovarianceDetector30s,
-    AutocovarianceDetectorAttentionDenoising30s,
-)
-from kfold_trainer import Trainer
+from config import KFOLD_SPLITS
+from training_models import Autoencoder, DenoisingAutoencoder, AutoencoderEnsemble
+from kfold_trainer import KfoldTrainer
 
-kfold_trainer = Trainer(Ensemble5CrossCovarianceDetector30s)
-kfold_trainer.train(
-    dataset="instance", epochs=20, splits=[0, 1, 2, 3, 4], starting_epoch=0
-)
+for split in range(KFOLD_SPLITS):
+    kfold_trainer = KfoldTrainer("exp_test", Autoencoder, "instance", split, epochs=20)
+    kfold_trainer.train()
 
-kfold_trainer = Trainer(Ensemble5CrossCovarianceDetector30s)
-kfold_trainer.train(
-    dataset="stead", epochs=20, splits=[0, 1, 2, 3, 4], starting_epoch=0
-)
+    kfold_trainer = KfoldTrainer("exp_test", Autoencoder, "stead", split, epochs=20)
+    kfold_trainer.train()
+
+for split in range(KFOLD_SPLITS):
+    kfold_trainer = KfoldTrainer(
+        "exp_test", DenoisingAutoencoder, "instance", split, epochs=20
+    )
+    kfold_trainer.train()
+
+    kfold_trainer = KfoldTrainer(
+        "exp_test", DenoisingAutoencoder, "stead", split, epochs=20
+    )
+    kfold_trainer.train()
+
+for split in range(KFOLD_SPLITS):
+    kfold_trainer = KfoldTrainer(
+        "exp_test", AutoencoderEnsemble, "instance", split, epochs=20
+    )
+    kfold_trainer.train()
+
+    kfold_trainer = KfoldTrainer(
+        "exp_test", AutoencoderEnsemble, "stead", split, epochs=20
+    )
+    kfold_trainer.train()

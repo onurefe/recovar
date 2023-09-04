@@ -5,6 +5,30 @@ from cubic_interpolation import cubic_interp1d
 
 
 @tf.keras.utils.register_keras_serializable()
+class AddNoise(tf.keras.layers.Layer):
+    def __init__(self, stddev, name="add_noise", *args, **kwargs):
+        super(AddNoise, self).__init__(name=name, **kwargs)
+        self.stddev = stddev
+
+    def call(self, x):
+        x = x + tf.random.normal(tf.shape(x), mean=0.0, stddev=self.stddev)
+        return x
+
+
+@tf.keras.utils.register_keras_serializable()
+class NormalizeStd(tf.keras.layers.Layer):
+    def __init__(self, axis=1, eps=1e-27, name="normalize_std", *args, **kwargs):
+        super(NormalizeStd, self).__init__(name=name, **kwargs)
+        self.axis = axis
+        self.eps = eps
+
+    def call(self, x):
+        std = tf.math.reduce_std(x, axis=self.axis, keepdims=True)
+        x = x / (self.eps + std)
+        return x
+
+
+@tf.keras.utils.register_keras_serializable()
 class Padding(tf.keras.layers.Layer):
     def __init__(self, size=[0, 0], type="REFLECT", name="padding", *args, **kwargs):
         super(Padding, self).__init__(name=name, **kwargs)

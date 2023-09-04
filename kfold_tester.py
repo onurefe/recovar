@@ -1,9 +1,10 @@
-from directory import TRAINED_MODELS_DIR, HOME_DIR, MONITORING_DIR
+from directory import *
 from config import BATCH_SIZE
 
 from os import makedirs
 import h5py
 import tensorflow as tf
+from kfold_environment import KFoldEnvironment
 
 
 class KFoldTester:
@@ -12,8 +13,8 @@ class KFoldTester:
         exp_name,
         training_ctor,
         monitor_ctor,
-        train_environment,
-        test_environment,
+        train_dataset,
+        test_dataset,
         split,
         epoch,
         monitored_params=[],
@@ -22,20 +23,23 @@ class KFoldTester:
         self.exp_name = exp_name
         self.training_ctor = training_ctor
         self.monitor_ctor = monitor_ctor
-        self.train_environment = train_environment
-        self.test_environment = test_environment
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
         self.split = split
         self.epoch = epoch
         self.monitored_params = monitored_params
         self.method_params = method_params
 
-        self.training_model_name = training_ctor().get_config()["name"]
-        self.monitoring_model_name = monitor_ctor().get_config()["name"]
+        self.training_model_name = training_ctor().name
+        self.monitoring_model_name = monitor_ctor().name
+        self._add_test_environment()
 
     def test(
         self,
     ):
-        makedirs(self.get_monitoring_output_dir(), exist_ok=True)
+        monitoring_output_dir = self._get_monitoring_output_dir()
+
+        makedirs(monitoring_output_dir, exist_ok=True)
 
         __, __, __, predict_gen = self.test_environment.get_generators(self.split)
 
@@ -46,38 +50,6 @@ class KFoldTester:
 
         self._save_data_file(monitoring_dict)
         self._save_meta_file(metadata)
-
-    def get_monitoring_output_dir(self):
-        return "{}/{}/training_{}/testing_{}/{}/split{}".format(
-            MONITORING_DIR,
-            self.exp_name,
-            self.train_environment.dataset,
-            self.test_environment.dataset,
-            self.monitoring_model_name,
-            self.split,
-        )
-    
-    def get_monitoring_meta_file_path(self):
-        return "{}/{}/training_{}/testing_{}/{}/split{}/meta.csv".format(
-            MONITORING_DIR,
-            self.exp_name,
-            self.train_environment.dataset,
-            self.test_environment.dataset,
-            self.monitoring_model_name,
-            self.split,
-        )
-
-    def get_monitoring_data_file_path(self):
-        return "{}/{}/training_{}/testing_{}/{}/split{}/epoch{}_monitoredparams{}.hdf5".format(
-            MONITORING_DIR,
-            self.exp_name,
-            self.train_environment.dataset,
-            self.test_environment.dataset,
-            self.monitoring_model_name,
-            self.split,
-            self.epoch,
-            self.monitored_params,
-        )
 
     def _save_data_file(self, monitoring_dict):
         with h5py.File(
@@ -98,11 +70,7 @@ class KFoldTester:
             metrics=[],
         )
 
-        model(
-            tf.random.normal(
-                shape=(BATCH_SIZE, model.N_TIMESTEPS, model.N_CHANNELS)
-            )
-        )
+        model(tf.random.normal(shape=(BATCH_SIZE, model.N_TIMESTEPS, model.N_CHANNELS)))
 
         return model
 
@@ -111,7 +79,9 @@ class KFoldTester:
 
         if self.epoch is not None:
             training_model.load_weights(
-                self.get_training_model_path(self.split, epoch=self.epoch)
+                get_checkpoint_path(
+                    self.training_model_name, self.train_dataset, self.split, self.epoch
+                )
             )
 
         monitoring_model = self.monitor_ctor(
@@ -120,3 +90,15 @@ class KFoldTester:
             method_params=self.method_params,
         )
         return monitoring_model
+
+    def _add_test_environment(self):
+        self.test_environment = KFoldEnvironment(self.train_dataset)
+
+    def _get_monitoring_output_dir(self):
+        return get_monitoring_output_dir(
+            self.exp_name,
+            self.monitoring_model_name,
+            self.train_dataset,
+            self.test_dataset,
+            self.split,
+        )

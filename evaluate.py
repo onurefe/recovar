@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import h5py as h5
 from os.path import exists
-from kfold_environment import KFoldEnvironment
 from kfold_tester import KFoldTester
+from directory import *
 from sklearn.metrics import (
     roc_curve,
 )
@@ -134,19 +134,22 @@ class Evaluate:
         train_dataset,
         test_dataset,
         epoch,
-        split_idx,
+        split,
         method_params,
-        monitored_param_list,
+        monitored_params,
         filters,
         metric,
     ):
-        self._exp_name = exp_name
-        self._epoch = epoch
-        self._split_idx = split_idx
-        self._method_params = method_params
-        self._monitored_param_list = monitored_param_list
-        self._filters = filters
-        self._metric = metric
+        self.exp_name = exp_name
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
+        self.epoch = epoch
+        self.split = split
+        self.method_params = method_params
+        self.monitored_params = monitored_params
+        self.filters = filters
+        self.metric = metric
+        self.monitoring_model_name = monitoring_model_ctor().name
 
         self._add_tester(
             train_dataset=train_dataset,
@@ -187,59 +190,70 @@ class Evaluate:
 
     def _get_monitoring_output(self):
         if not self._are_monitoring_files_present():
-            self._monitor()
+            self.tester.test()
 
         monitoring_meta = self._read_monitoring_meta()
         monitoring_data = self._read_monitoring_data()
 
         return monitoring_meta, monitoring_data
 
-    def _are_monitoring_files_present(self):
-        return exists(self.tester.get_monitoring_data_file_path()) and exists(
-            self.tester.get_monitoring_meta_file_path()
-        )
-
     def _read_monitoring_meta(self):
-        return pd.read_csv(self.tester.get_monitoring_meta_file_path())
+        return pd.read_csv(self._get_meta_file_path())
 
     def _read_monitoring_data(
         self,
     ):
         f = h5.File(
-            self.tester.get_monitoring_data_file_path(),
+            self._get_data_file_path(),
             "r",
         )
 
         monitoring_data = {}
-        for key in self._monitored_param_list:
+        for key in self.monitored_params:
             monitoring_data[key] = np.array(f[key])
 
         f.close()
 
         return monitoring_data
 
-    def _monitor(self):
-        self.tester.test(
-            exp_name=self._exp_name,
-            splits=self._split_idx,
-            monitored_params=self._monitored_param_list,
-            method_params=self._method_params,
-        )
-
     def _add_tester(
         self, train_dataset, test_dataset, training_model_ctor, monitoring_model_ctor
     ):
-        train_kenv = KFoldEnvironment(
-            dataset=train_dataset,
-        )
-
-        test_kenv = KFoldEnvironment(
-            dataset=test_dataset,
-        )
-
         self.tester = KFoldTester(
-            train_environment=train_kenv,
-            test_environment=test_kenv,
-            detector_ctor=training_model_ctor,
-            monitor_ctor=monitoring_model_ctor,
+            self.exp_name,
+            training_ctor=training_model_ctor,
+            monitoring_ctor=monitoring_model_ctor,
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            split=self.split,
+            epoch=self.epoch,
+            monitored_params=self.monitored_params,
+            method_params=self.method_params,
         )
+
+    def _are_monitoring_files_present(self):
+        return exists(self._get_data_file_path()) and exists(self._get_meta_file_path())
+
+    def _get_data_file_path(self):
+        data_file_path = get_monitoring_data_file_path(
+            self.exp_name,
+            self.monitoring_model_name,
+            self.train_dataset,
+            self.test_dataset,
+            self.split,
+            self.epoch,
+            self.monitored_params,
+        )
+
+        return data_file_path
+
+    def _get_meta_file_path(self):
+        meta_file_path = get_monitoring_meta_file_path(
+            self.exp_name,
+            self.monitoring_model_name,
+            self.train_dataset,
+            self.test_dataset,
+            self.split,
+        )
+
+        return meta_file_path
