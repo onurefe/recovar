@@ -125,7 +125,7 @@ class CropOffsetFilter(TracesFilter):
         ]
 
 
-class Evaluate:
+class Evaluator:
     def __init__(
         self,
         exp_name,
@@ -133,27 +133,23 @@ class Evaluate:
         monitoring_model_ctor,
         train_dataset,
         test_dataset,
+        filters,
         epoch,
         split,
         method_params,
-        monitored_params,
-        filters,
         metric,
     ):
         self.exp_name = exp_name
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
+        self.filters = filters
         self.epoch = epoch
         self.split = split
         self.method_params = method_params
-        self.monitored_params = monitored_params
-        self.filters = filters
         self.metric = metric
         self.monitoring_model_name = monitoring_model_ctor().name
 
         self._add_tester(
-            train_dataset=train_dataset,
-            test_dataset=test_dataset,
             training_model_ctor=training_model_ctor,
             monitoring_model_ctor=monitoring_model_ctor,
         )
@@ -166,7 +162,7 @@ class Evaluate:
             monitoring_meta, monitoring_data
         )
 
-        metric = self._metric(monitoring_data)
+        metric = self.metric(monitoring_data)
         labels = monitoring_meta["label"] == "eq"
 
         fpr, tpr, thresholds = roc_curve(labels, metric)
@@ -177,13 +173,13 @@ class Evaluate:
         _monitoring_meta = monitoring_meta.copy()
         _monitoring_meta.reset_index(inplace=True)
 
-        for filter in self._filters:
+        for filter in self.filters:
             _monitoring_meta = filter.apply(_monitoring_meta)
 
         _monitoring_meta = _monitoring_meta.sample(frac=1)
 
         indexer = np.array(_monitoring_meta.index)
-        for key in self._monitored_param_list:
+        for key in self.metric.monitored_params:
             monitoring_data[key] = monitoring_data[key][indexer]
 
         return _monitoring_meta, monitoring_data
@@ -209,25 +205,23 @@ class Evaluate:
         )
 
         monitoring_data = {}
-        for key in self.monitored_params:
+        for key in self.metric.monitored_params:
             monitoring_data[key] = np.array(f[key])
 
         f.close()
 
         return monitoring_data
 
-    def _add_tester(
-        self, train_dataset, test_dataset, training_model_ctor, monitoring_model_ctor
-    ):
+    def _add_tester(self, training_model_ctor, monitoring_model_ctor):
         self.tester = KFoldTester(
             self.exp_name,
             training_ctor=training_model_ctor,
             monitoring_ctor=monitoring_model_ctor,
-            train_dataset=train_dataset,
-            test_dataset=test_dataset,
+            train_dataset=self.train_dataset,
+            test_dataset=self.test_dataset,
             split=self.split,
             epoch=self.epoch,
-            monitored_params=self.monitored_params,
+            monitored_params=self.metric.monitored_params,
             method_params=self.method_params,
         )
 
@@ -242,7 +236,7 @@ class Evaluate:
             self.test_dataset,
             self.split,
             self.epoch,
-            self.monitored_params,
+            self.metric.monitored_params,
         )
 
         return data_file_path
