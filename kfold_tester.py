@@ -12,26 +12,26 @@ class KFoldTester:
         self,
         exp_name,
         training_ctor,
-        monitor_ctor,
+        monitoring_ctor,
         train_dataset,
         test_dataset,
         split,
-        epoch,
+        epochs,
         monitored_params=[],
         method_params={},
     ):
         self.exp_name = exp_name
         self.training_ctor = training_ctor
-        self.monitor_ctor = monitor_ctor
+        self.monitoring_ctor = monitoring_ctor
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.split = split
-        self.epoch = epoch
+        self.epochs = epochs
         self.monitored_params = monitored_params
         self.method_params = method_params
 
         self.training_model_name = training_ctor().name
-        self.monitoring_model_name = monitor_ctor().name
+        self.monitoring_model_name = monitoring_ctor().name
         self._add_test_environment()
 
     def test(
@@ -40,27 +40,43 @@ class KFoldTester:
         monitoring_output_dir = self._get_monitoring_output_dir()
 
         makedirs(monitoring_output_dir, exist_ok=True)
-
         __, __, __, predict_gen = self.test_environment.get_generators(self.split)
 
-        monitoring_model = self._create_monitoring_model()
+        for epoch in self.epochs:
+            monitoring_model = self._create_monitoring_model(epoch)
+            monitoring_dict = monitoring_model.predict(predict_gen)
+            self._save_data_file(monitoring_dict, epoch)
 
-        monitoring_dict = monitoring_model.predict(predict_gen)
         __, __, metadata = self.test_environment.get_split_metadata(self.split)
-
-        self._save_data_file(monitoring_dict)
         self._save_meta_file(metadata)
 
-    def _save_data_file(self, monitoring_dict):
-        with h5py.File(
-            self.get_monitoring_data_file_path(),
-            "w",
-        ) as f:
+    def _save_data_file(self, monitoring_dict, epoch):
+        data_file_path = get_monitoring_data_file_path(
+            self.exp_name,
+            self.training_model_name,
+            self.monitoring_model_name,
+            self.train_dataset,
+            self.test_dataset,
+            self.split,
+            epoch,
+            self.monitored_params,
+        )
+
+        with h5py.File(data_file_path, "w") as f:
             for key in monitoring_dict.keys():
                 f.create_dataset(key, data=monitoring_dict[key])
 
     def _save_meta_file(self, metadata):
-        metadata.to_csv(self.get_monitoring_meta_file_path())
+        meta_file_path = get_monitoring_meta_file_path(
+            self.exp_name,
+            self.training_model_name,
+            self.monitoring_model_name,
+            self.train_dataset,
+            self.test_dataset,
+            self.split,
+        )
+
+        metadata.to_csv(meta_file_path)
 
     def _create_training_model(self):
         model = self.training_ctor()
@@ -74,19 +90,25 @@ class KFoldTester:
 
         return model
 
-    def _create_monitoring_model(self):
-        training_model = self._create_training_model()
+    def _create_monitoring_model(self, epoch):
+        if self.training_ctor is not None:
+            training_model = self._create_training_model()
 
-        if self.epoch is not None:
             training_model.load_weights(
                 get_checkpoint_path(
-                    self.training_model_name, self.train_dataset, self.split, self.epoch
+                    self.exp_name,
+                    self.training_model_name,
+                    self.train_dataset,
+                    self.split,
+                    epoch,
                 )
             )
+        else:
+            training_model = None
 
-        monitoring_model = self.monitor_ctor(
+        monitoring_model = self.monitoring_ctor(
             training_model,
-            monitor_params=self.monitored_params,
+            monitored_params=self.monitored_params,
             method_params=self.method_params,
         )
         return monitoring_model
@@ -97,6 +119,7 @@ class KFoldTester:
     def _get_monitoring_output_dir(self):
         return get_monitoring_output_dir(
             self.exp_name,
+            self.training_model_name,
             self.monitoring_model_name,
             self.train_dataset,
             self.test_dataset,

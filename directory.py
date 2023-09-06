@@ -17,23 +17,39 @@ PREPROCESSED_DATASET_DIRECTORY = "/home/onur/dataset_preprocessed"
 
 
 def get_monitoring_output_dir(
-    exp_name, monitoring_model_name, train_dataset, test_dataset, split
+    exp_name,
+    training_model_name,
+    monitoring_model_name,
+    train_dataset,
+    test_dataset,
+    split,
 ):
     return join(
         MONITORING_DIR,
         exp_name,
         monitoring_model_name,
+        training_model_name,
         "training_" + train_dataset,
         "testing_" + test_dataset,
-        split,
+        "split" + str(split),
     )
 
 
 def get_monitoring_meta_file_path(
-    exp_name, monitoring_model_name, train_dataset, test_dataset, split
+    exp_name,
+    training_model_name,
+    monitoring_model_name,
+    train_dataset,
+    test_dataset,
+    split,
 ):
     monitoring_output_dir = get_monitoring_output_dir(
-        exp_name, monitoring_model_name, train_dataset, test_dataset, split
+        exp_name,
+        training_model_name,
+        monitoring_model_name,
+        train_dataset,
+        test_dataset,
+        split,
     )
 
     return join(monitoring_output_dir, "meta.csv")
@@ -41,6 +57,7 @@ def get_monitoring_meta_file_path(
 
 def get_monitoring_data_file_path(
     exp_name,
+    training_model_name,
     monitoring_model_name,
     train_dataset,
     test_dataset,
@@ -49,7 +66,12 @@ def get_monitoring_data_file_path(
     monitored_params,
 ):
     monitoring_output_dir = get_monitoring_output_dir(
-        exp_name, monitoring_model_name, train_dataset, test_dataset, split
+        exp_name,
+        training_model_name,
+        monitoring_model_name,
+        train_dataset,
+        test_dataset,
+        split,
     )
 
     filename = "epoch{}_monitoredparams{}.hdf5".format(epoch, monitored_params)
@@ -57,20 +79,28 @@ def get_monitoring_data_file_path(
     return join(monitoring_output_dir, filename)
 
 
-def get_checkpoint_dir(exp_name, model_name, train_dataset, split):
+def get_checkpoint_dir(exp_name, training_model_name, train_dataset, split):
     return join(
-        TRAINED_MODELS_DIR, exp_name, model_name, train_dataset, "split{}".format(split)
+        TRAINED_MODELS_DIR,
+        exp_name,
+        training_model_name,
+        train_dataset,
+        "split" + str(split),
     )
 
 
-def get_checkpoint_path(exp_name, model_name, train_dataset, split, epoch):
-    checkpoint_dir = get_checkpoint_dir(exp_name, model_name, train_dataset, split)
+def get_checkpoint_path(exp_name, training_model_name, train_dataset, split, epoch):
+    checkpoint_dir = get_checkpoint_dir(
+        exp_name, training_model_name, train_dataset, split
+    )
     filename = "ep{}.h5".format(epoch)
 
     return join(checkpoint_dir, filename)
 
 
-def get_history_csv_path(exp_name, model_name, train_dataset, split):
-    checkpoint_dir = get_checkpoint_dir(exp_name, model_name, train_dataset, split)
+def get_history_csv_path(exp_name, training_model_name, train_dataset, split):
+    checkpoint_dir = get_checkpoint_dir(
+        exp_name, training_model_name, train_dataset, split
+    )
 
     return join(checkpoint_dir, "history.csv")

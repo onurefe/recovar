@@ -5,7 +5,7 @@ class Metric:
     def __init__(self):
         pass
 
-    def value(self, monitoring_data):
+    def __call__(self, monitoring_data):
         num_samples = np.shape(monitoring_data)[0]
         return np.zeros(num_samples)
 
@@ -14,7 +14,7 @@ class Identity(Metric):
     def __init__(self, monitored_params=[]):
         self.monitored_params = monitored_params
 
-    def value(self, monitoring_data):
+    def __call__(self, monitoring_data):
         return monitoring_data[self.monitored_params[0]]
 
     @property
@@ -26,7 +26,7 @@ class Variance(Metric):
     def __init__(self):
         pass
 
-    def value(self, monitoring_data):
+    def __call__(self, monitoring_data):
         detection_variable = monitoring_data[self.INPUT_PARAM]
         result = np.maximum(detection_variable, axis=1)
         return result
@@ -49,7 +49,7 @@ class CovarianceWeightedAverage(Metric):
         g = np.exp(-np.power(t, 2.0) / (2 * np.power(self.sigma, 2.0)))
         return g / np.sum(g, axis=axis, keepdims=True)
 
-    def value(self, monitoring_data):
+    def __call__(self, monitoring_data):
         detection_variable = monitoring_data[self.input_param]
         n_timesteps = np.shape(detection_variable)[1]
         g = self._gaussian_window(n_timesteps)

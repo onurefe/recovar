@@ -33,8 +33,8 @@ class SNRFilter(TracesFilter):
         self.snr_max = snr_max
 
     def apply(self, df_traces, dataset):
-        df_traces = df_traces.copy()
-        df_eq_traces, df_no_traces = self._split_eq_and_noise_traces()
+        _df_traces = df_traces.copy()
+        df_eq_traces, df_no_traces = self._split_eq_and_noise_traces(_df_traces)
 
         if dataset == "stead":
             df_eq_traces = self._parse_stead_metadata_enz_snrs(df_eq_traces)
@@ -100,8 +100,8 @@ class CropOffsetFilter(TracesFilter):
         self.window_size_in_samples = int(sampling_frequency * window_size_in_seconds)
 
     def apply(self, df_traces, dataset):
-        df_traces = df_traces.copy()
-        df_eq_traces, df_no_traces = self._split_eq_and_noise_traces()
+        _df_traces = df_traces.copy()
+        df_eq_traces, df_no_traces = self._split_eq_and_noise_traces(_df_traces)
 
         df_eq_traces = self._filter_eq_traces(df_eq_traces)
 
@@ -134,7 +134,7 @@ class Evaluator:
         train_dataset,
         test_dataset,
         filters,
-        epoch,
+        epochs,
         split,
         method_params,
         metric,
@@ -143,10 +143,11 @@ class Evaluator:
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.filters = filters
-        self.epoch = epoch
+        self.epochs = epochs
         self.split = split
         self.method_params = method_params
         self.metric = metric
+        self.training_model_name = training_model_ctor().name
         self.monitoring_model_name = monitoring_model_ctor().name
 
         self._add_tester(
@@ -157,50 +158,59 @@ class Evaluator:
     def get_roc_vectors(
         self,
     ):
-        monitoring_meta, monitoring_data = self._get_monitoring_output()
-        monitoring_meta, monitoring_data = self._apply_filters(
-            monitoring_meta, monitoring_data
-        )
-
-        metric = self.metric(monitoring_data)
-        labels = monitoring_meta["label"] == "eq"
-
-        fpr, tpr, thresholds = roc_curve(labels, metric)
-
-        return tpr, fpr, thresholds
-
-    def _apply_filters(self, monitoring_meta, monitoring_data):
-        _monitoring_meta = monitoring_meta.copy()
-        _monitoring_meta.reset_index(inplace=True)
-
-        for filter in self.filters:
-            _monitoring_meta = filter.apply(_monitoring_meta)
-
-        _monitoring_meta = _monitoring_meta.sample(frac=1)
-
-        indexer = np.array(_monitoring_meta.index)
-        for key in self.metric.monitored_params:
-            monitoring_data[key] = monitoring_data[key][indexer]
-
-        return _monitoring_meta, monitoring_data
-
-    def _get_monitoring_output(self):
         if not self._are_monitoring_files_present():
             self.tester.test()
 
         monitoring_meta = self._read_monitoring_meta()
-        monitoring_data = self._read_monitoring_data()
+        monitoring_meta = self._apply_filters(monitoring_meta)
+        indexer = np.array(monitoring_meta.index)
+
+        roc_vectors = []
+        for epoch in self.epochs:
+            monitoring_data = self._read_monitoring_data(epoch)
+            monitoring_data = self._slice_monitoring_tensors(monitoring_data, indexer)
+            tpr, fpr, thresholds = self._get_roc_vector(
+                monitoring_data, monitoring_meta
+            )
+            roc_vectors.append({"tpr": tpr, "fpr": fpr, "thresholds": thresholds})
+
+        return roc_vectors
+
+    def _get_roc_vector(self, monitoring_data, monitoring_meta):
+        metric = self.metric(monitoring_data)
+        labels = monitoring_meta["label"] == "eq"
+        fpr, tpr, thresholds = roc_curve(labels, metric)
+
+        return tpr, fpr, thresholds
+
+    def _slice_monitoring_tensors(self, monitoring_data, indexer):
+        for key in self.metric.monitored_params:
+            monitoring_data[key] = monitoring_data[key][indexer]
+
+        return monitoring_data
+
+    def _apply_filters(self, monitoring_meta):
+        _monitoring_meta = monitoring_meta.copy()
+        _monitoring_meta.reset_index(inplace=True)
+
+        for filter in self.filters:
+            _monitoring_meta = filter.apply(_monitoring_meta, self.test_dataset)
+
+        _monitoring_meta = _monitoring_meta.sample(frac=1)
+
+        return _monitoring_meta
+
+    def _get_monitoring_output(self, epoch):
+        monitoring_meta = self._read_monitoring_meta()
 
         return monitoring_meta, monitoring_data
 
     def _read_monitoring_meta(self):
         return pd.read_csv(self._get_meta_file_path())
 
-    def _read_monitoring_data(
-        self,
-    ):
+    def _read_monitoring_data(self, epoch):
         f = h5.File(
-            self._get_data_file_path(),
+            self._get_data_file_path(epoch),
             "r",
         )
 
@@ -220,22 +230,34 @@ class Evaluator:
             train_dataset=self.train_dataset,
             test_dataset=self.test_dataset,
             split=self.split,
-            epoch=self.epoch,
+            epochs=self.epochs,
             monitored_params=self.metric.monitored_params,
             method_params=self.method_params,
         )
 
     def _are_monitoring_files_present(self):
-        return exists(self._get_data_file_path()) and exists(self._get_meta_file_path())
+        return self._are_data_files_present() and self._is_meta_file_present()
 
-    def _get_data_file_path(self):
+    def _are_data_files_present(self):
+        data_file_existances = []
+
+        for epoch in self.epochs:
+            data_file_existances.append(exists(self._get_data_file_path(epoch)))
+
+        return np.array(data_file_existances).all()
+
+    def _is_meta_file_present(self):
+        return exists(self._get_meta_file_path())
+
+    def _get_data_file_path(self, epoch):
         data_file_path = get_monitoring_data_file_path(
             self.exp_name,
+            self.training_model_name,
             self.monitoring_model_name,
             self.train_dataset,
             self.test_dataset,
             self.split,
-            self.epoch,
+            epoch,
             self.metric.monitored_params,
         )
 
@@ -244,6 +266,7 @@ class Evaluator:
     def _get_meta_file_path(self):
         meta_file_path = get_monitoring_meta_file_path(
             self.exp_name,
+            self.training_model_name,
             self.monitoring_model_name,
             self.train_dataset,
             self.test_dataset,

@@ -122,11 +122,7 @@ class Autocovariance(keras.Model):
         x = self.model.inp(inputs)
         x = tf.cast(x, dtype=tf.float32)
 
-        x = self.normalize_std(self.add_eps_noise(x))
-
         f, y = self.model(x, training=training)
-
-        f = f - tf.reduce_mean(f, axis=1)
 
         monitor = {}
 
