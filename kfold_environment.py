@@ -390,7 +390,7 @@ class KFoldEnvironment:
         metadata = pd.read_csv(metadata_csv)
 
         metadata["source_id"] = metadata["source_id"].astype(str)
-        metadata.rename({"receiver_code": "station_name"})
+        metadata.rename(columns={"receiver_code": "station_name"}, inplace=True)
 
         eq_metadata = metadata[metadata.trace_category == "earthquake_local"].copy()
         no_metadata = metadata[metadata.trace_category == "noise"].copy()

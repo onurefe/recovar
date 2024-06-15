@@ -73,7 +73,7 @@ class AutoencoderBlock(keras.Model):
         return x
 
     def call(self, inputs, training=False):
-        x = self.inp(inputs)
+        x = inputs
         x = tf.cast(x, dtype=tf.float32)
 
         f = self._encoder(x, training=training)

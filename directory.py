@@ -1,19 +1,37 @@
 from os.path import join
+from os.path import exists
+from os import makedirs
 
-HOME_DIR = "."
-TRAINED_MODELS_DIR = f"{HOME_DIR}/trained_models"
-MONITORING_DIR = f"{HOME_DIR}/monitoring"
-RESULTS_DIR = f"{HOME_DIR}/results"
+# We need to retry with HOME_DIR='.', last time, there were some issues with it. So it is better to localize it for now.
+HOME_DIR = "/home/ege/Documents/EARTH-ML/LatentCovarianceBasedSeismicEventDetection/main/"
+ALL_DIR = 'latcov_all_data'
 
-STEAD_WAVEFORMS_HDF5_PATH = "/home/onur/stead/waveforms.hdf5"
-STEAD_METADATA_CSV_PATH = "/home/onur/stead/metadata.csv"
+TRAINED_MODELS_DIR = join(HOME_DIR, ALL_DIR, 'trained_models')
+MONITORING_DIR = join(HOME_DIR, ALL_DIR, 'monitoring')
+RESULTS_DIR = join(HOME_DIR, ALL_DIR, 'results')
 
-INSTANCE_NOISE_WAVEFORMS_HDF5_PATH = "/home/onur/instance/noise/waveforms.hdf5"
-INSTANCE_EQ_WAVEFORMS_HDF5_PATH = "/home/onur/instance/events/waveforms.hdf5"
-INSTANCE_NOISE_METADATA_CSV_PATH = "/home/onur/instance/noise/metadata.csv"
-INSTANCE_EQ_METADATA_CSV_PATH = "/home/onur/instance/events/metadata.csv"
+STEAD_DIR = join(HOME_DIR, ALL_DIR, 'stead')
+STEAD_WAVEFORMS_HDF5_PATH = join(STEAD_DIR, 'waveforms.hdf5')
+STEAD_METADATA_CSV_PATH = join(STEAD_DIR, 'metadata.csv')
 
-PREPROCESSED_DATASET_DIRECTORY = "/home/onur/dataset_preprocessed"
+
+INSTANCE_DIR = join(HOME_DIR, ALL_DIR, 'instance')
+NOISE_DIR = join(INSTANCE_DIR, 'noise')
+EVENTS_DIR = join(INSTANCE_DIR, 'events')
+
+INSTANCE_NOISE_WAVEFORMS_HDF5_PATH = join(NOISE_DIR, 'waveforms.hdf5')
+INSTANCE_NOISE_METADATA_CSV_PATH = join(NOISE_DIR, 'metadata.csv')
+
+INSTANCE_EQ_WAVEFORMS_HDF5_PATH = join(EVENTS_DIR, 'waveforms.hdf5')
+INSTANCE_EQ_METADATA_CSV_PATH = join(EVENTS_DIR, 'metadata.csv')
+
+
+PREPROCESSED_DATASET_DIRECTORY = join(HOME_DIR, ALL_DIR, 'dataset_preprocessed')
+
+def initiate_dirs(dirs=[ALL_DIR,TRAINED_MODELS_DIR, MONITORING_DIR, RESULTS_DIR, STEAD_DIR, INSTANCE_DIR,NOISE_DIR,EVENTS_DIR,PREPROCESSED_DATASET_DIRECTORY]):
+    for dir in dirs: 
+        if not exists(dir):
+            makedirs(dir)
 
 
 def get_monitoring_output_dir(
@@ -93,7 +111,7 @@ def get_checkpoint_path(exp_name, training_model_name, train_dataset, split, epo
     checkpoint_dir = get_checkpoint_dir(
         exp_name, training_model_name, train_dataset, split
     )
-    filename = "ep{}.h5".format(epoch)
+    filename = "ep{}.weights.h5".format(epoch)
 
     return join(checkpoint_dir, filename)
 

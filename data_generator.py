@@ -315,7 +315,6 @@ class DataGenerator(Sequence):
             the phase arrival times.
         eq_hdf5_path (str): Path of the hdf5 file that contains the waveforms of the eq events.
         no_hdf5_path (str): Path of the hdf5 file that contains the waveforms of the no events.
-        meta_parser (MetaParser): MetaParser instance that is used to parse the metadata.
         dataset_time_window (float): The time window of the dataset.
         model_time_window (float): The time window of the model.
         phase_ensured_crop_ratio (float): The ratio of the eq waveforms that are ensured to include
@@ -348,12 +347,14 @@ class DataGenerator(Sequence):
         self.sampling_freq = sampling_freq
         self.active_chunks = active_chunks
         self.bg_args = args
-        self.bg_kwargs = kwargs
-        self.processed_hdf5 = h5py.File(self.processed_hdf5_path, "r", locking=True)
+        self.bg_kwargs = kwargs  
         self.chunk_batch_counts = self.get_chunk_batch_counts()
-
-        if not exists(self.processed_hdf5_path):
+        if not exists(self.processed_hdf5_path): # Changed the line order due to error when file doesn't exist
             self._render_dataset()
+        self.processed_hdf5 = h5py.File(self.processed_hdf5_path, "r", locking=True)
+     
+
+  
 
     def getitem(self, idx):
         """
@@ -439,7 +440,7 @@ class DataGenerator(Sequence):
                     batch_metadata=self.chunk_metadata_list[chunk_idx],
                     eq_hdf5_path=self.bg_kwargs["eq_hdf5_path"],
                     no_hdf5_path=self.bg_kwargs["no_hdf5_path"],
-                    meta_parser=self.bg_kwargs["meta_parser"],
+               
                     dataset_time_window=self.dataset_time_window,
                     model_time_window=self.model_time_window,
                     sampling_freq=self.sampling_freq,

@@ -5,20 +5,20 @@ from os.path import join
 from os import makedirs
 import pandas as pd
 import tensorflow as tf
-
+import numpy as np
 
 class CheckpointCallback(tf.keras.callbacks.Callback):
     def __init__(self, exp_name, model, train_dataset, split):
         self.exp_name = exp_name
-        self.model = model
+        self._model = model
         self.train_dataset = train_dataset
         self.split = split
 
     def on_epoch_end(self, epoch, logs):
         checkpoint_path = get_checkpoint_path(
-            self.exp_name, self.model.name, self.train_dataset, self.split, epoch
+            self.exp_name, self._model.name, self.train_dataset, self.split, epoch
         )
-        self.model.save_weights(checkpoint_path)
+        self._model.save_weights(checkpoint_path)
 
 
 class KfoldTrainer:
@@ -86,6 +86,8 @@ class KfoldTrainer:
             split,
         )
 
+        x_init, __ = train_gen.__getitem__(0)
+        model(np.array(x_init))
         fit_result = model.fit(
             train_gen,
             validation_data=validation_gen,
@@ -118,3 +120,4 @@ class KfoldTrainer:
         ) as f:
             hist_df = pd.DataFrame(fit_result.history)
             hist_df.to_csv(f)
+# ValueError: The filename must end in `.weights.h5`. Received: filepath=/home/ege/Documents/EARTH-ML/LatentCovarianceBasedSeismicEventDetection/main/latcov_all_data/trained_models/exp_test/autoencoder_ensemble/stead/split4/ep0.h5

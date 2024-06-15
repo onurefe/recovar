@@ -188,7 +188,7 @@ class AutoencoderEnsemble(keras.Model):
         self.bn5 = tf.keras.layers.BatchNormalization(center=False, scale=False)
 
     def call(self, inputs, training=False):
-        x = self.inp(inputs)
+        x = inputs
         x = tf.cast(x, dtype=tf.float32)
 
         x = self.normalize1(x)
@@ -234,8 +234,9 @@ class AutoencoderEnsemble(keras.Model):
         )
 
         self.add_loss(reconstruction_loss + ensemble_distance_loss)
-
-        return f1p, f2p, f3p, f4p, f5p, y1, y2, y3, y4, y5
+        
+        if not training:
+            return f1p, f2p, f3p, f4p, f5p, y1, y2, y3, y4, y5
 
     def _get_ensemble_distance_loss(self, f1p, f2p, f3p, f4p, f5p):
         ensemble_distance_loss = (
