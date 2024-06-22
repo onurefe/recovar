@@ -119,7 +119,7 @@ class Autocovariance(keras.Model):
         self.cc = CrossCovarianceCircular()
 
     def call(self, inputs, training=False):
-        x = self.model.inp(inputs)
+        x = inputs #self.model.inp(inputs)
         x = tf.cast(x, dtype=tf.float32)
 
         f, y = self.model(x, training=training)
@@ -229,7 +229,7 @@ class AugmentationCrossCovariances(keras.Model):
         return tf.reduce_mean(tf.convert_to_tensor(covariances), axis=0)
 
     def call(self, inputs, training=False):
-        x = self.inp(inputs)
+        x = inputs
         x = tf.cast(x, dtype=tf.float32)
 
         x = l2_normalize(x)
@@ -238,7 +238,7 @@ class AugmentationCrossCovariances(keras.Model):
         augmented_f = [0] * self.method_params["augmentations"]
         augmented_y = [0] * self.method_params["augmentations"]
 
-        for i in range(self.augmentations):
+        for i in range(self.method_params["augmentations"]):
             augmented_x[i] = self._timewarp(x)
 
             augmented_f[i], augmented_y[i] = self.model(

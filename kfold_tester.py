@@ -16,7 +16,7 @@ class KFoldTester:
         train_dataset,
         test_dataset,
         split,
-        epochs,
+        epochs, # perhaps we could change this as epochs=[]
         monitored_params=[],
         method_params={},
     ):

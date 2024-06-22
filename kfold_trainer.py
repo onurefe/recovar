@@ -21,7 +21,7 @@ class CheckpointCallback(tf.keras.callbacks.Callback):
         self._model.save_weights(checkpoint_path)
 
 
-class KfoldTrainer:
+class KFoldTrainer:
     def __init__(
         self,
         exp_name,

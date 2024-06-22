@@ -372,6 +372,9 @@ class DataGenerator(Sequence):
         y_batch = self.processed_hdf5.get(
             "data/y/chunk{}/{}".format(chunk_idx, batch_offset)
         )
+        # Added to fix a bug
+        x_batch = np.array(x_batch)
+        y_batch = np.array(y_batch)
 
         return x_batch, y_batch
 

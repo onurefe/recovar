@@ -25,9 +25,9 @@ def diff(x, axis):
     """
     shapex = tf.shape(x)
     xdiff = tf.roll(x, shift=-1, axis=axis) - x
-    slice_start = tf.zeros(len(shapex), dtype=tf.int32)
+    slice_start = tf.zeros(tf.shape(shapex)[0], dtype=tf.int32)
     slice_end = shapex - tf.constant(
-        [(i == axis) for i in range(len(shapex))], dtype=tf.int32
+        [(i == axis) for i in tf.range(tf.shape(shapex)[0])], dtype=tf.int32
     )
 
     return tf.slice(xdiff, slice_start, slice_end)
@@ -49,7 +49,7 @@ def cubic_interp1d(x0, x, y):
 
     additional ref: www.math.uh.edu/~jingqiu/math4364/spline.pdf
     """
-    size = len(x)
+    size = tf.shape(x)[0]
 
     xdiff = diff(x, axis=0)
     ydiff = diff(y, axis=0)
