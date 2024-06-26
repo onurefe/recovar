@@ -1,11 +1,15 @@
 from directory import *
 from config import BATCH_SIZE
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from os import makedirs
 import h5py
 import tensorflow as tf
 from kfold_environment import KFoldEnvironment
 
+from training_models import AutoencoderEnsemble as RCCTraining
+from monitor_models import RepresentationCrossCovariances as RCCMonitoring
 
 class KFoldTester:
     def __init__(
@@ -114,7 +118,7 @@ class KFoldTester:
         return monitoring_model
 
     def _add_test_environment(self):
-        self.test_environment = KFoldEnvironment(self.train_dataset)
+        self.test_environment = KFoldEnvironment(self.test_dataset)
 
     def _get_monitoring_output_dir(self):
         return get_monitoring_output_dir(
@@ -125,3 +129,6 @@ class KFoldTester:
             self.test_dataset,
             self.split,
         )
+
+#tester = KFoldTester("exp_test", RCCTraining, RCCMonitoring, "stead", "stead", 0, [8], ["x", "fcov", "f1", "f2"])
+#tester.test()

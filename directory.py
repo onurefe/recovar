@@ -4,6 +4,7 @@ HOME_DIR = "."
 TRAINED_MODELS_DIR = f"{HOME_DIR}/trained_models"
 MONITORING_DIR = f"{HOME_DIR}/monitoring"
 RESULTS_DIR = f"{HOME_DIR}/results"
+PLOTS_DIR = f"{HOME_DIR}/plots"
 
 STEAD_WAVEFORMS_HDF5_PATH = "/home/onur/stead/waveforms.hdf5"
 STEAD_METADATA_CSV_PATH = "/home/onur/stead/metadata.csv"

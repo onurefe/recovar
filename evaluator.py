@@ -99,7 +99,7 @@ class CropOffsetFilter(TracesFilter):
         )
         self.window_size_in_samples = int(sampling_frequency * window_size_in_seconds)
 
-    def apply(self, df_traces, dataset):
+    def apply(self, df_traces):
         _df_traces = df_traces.copy()
         df_eq_traces, df_no_traces = self._split_eq_and_noise_traces(_df_traces)
 
@@ -199,11 +199,6 @@ class Evaluator:
         _monitoring_meta = _monitoring_meta.sample(frac=1)
 
         return _monitoring_meta
-
-    def _get_monitoring_output(self, epoch):
-        monitoring_meta = self._read_monitoring_meta()
-
-        return monitoring_meta, monitoring_data
 
     def _read_monitoring_meta(self):
         return pd.read_csv(self._get_meta_file_path())

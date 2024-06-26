@@ -103,7 +103,7 @@ class Autocovariance(keras.Model):
         model=None,
         monitored_params=["fcov"],
         method_params={},
-        name="Autocovariance",
+        name="autocovariance",
         *args,
         **kwargs
     ):
@@ -238,7 +238,7 @@ class AugmentationCrossCovariances(keras.Model):
         augmented_f = [0] * self.method_params["augmentations"]
         augmented_y = [0] * self.method_params["augmentations"]
 
-        for i in range(self.augmentations):
+        for i in range(self.method_params["augmentations"]):
             augmented_x[i] = self._timewarp(x)
 
             augmented_f[i], augmented_y[i] = self.model(

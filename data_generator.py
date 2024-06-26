@@ -349,12 +349,13 @@ class DataGenerator(Sequence):
         self.active_chunks = active_chunks
         self.bg_args = args
         self.bg_kwargs = kwargs
-        self.processed_hdf5 = h5py.File(self.processed_hdf5_path, "r", locking=True)
         self.chunk_batch_counts = self.get_chunk_batch_counts()
 
         if not exists(self.processed_hdf5_path):
             self._render_dataset()
-
+        
+        self.processed_hdf5 = h5py.File(self.processed_hdf5_path, "r", locking=True)
+        
     def getitem(self, idx):
         """
         Args:

@@ -97,8 +97,7 @@ class DenoisingAutoencoder(keras.Model):
         x = self.normalize2(x)
 
         if training:
-            x_noised = self.add_noise_denoising(x)
-            x_noised = self.normalize_denoising(x)
+            x_noised = self.normalize_denoising(self.add_noise_denoising(x))
         else:
             x_noised = x
 
