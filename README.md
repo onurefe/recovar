@@ -4,8 +4,7 @@
 
 ## Overview
 
-**The Seismic Purifier** is an unsupervised machine learning framework for detecting seismic signals from continuous waveform data. By leveraging representation learning through deep auto-encoders, 
-this method aims to effectively distinguish between seismic signals and noise without supervision, offering competitive performances to many state-of-the-art supervised methods in cross-dataset scenarios.
+**The Seismic Purifier** is an unsupervised machine learning framework for detecting seismic signals from continuous waveform data. By leveraging representation learning through deep auto-encoders, this method aims to effectively distinguish between seismic signals and noise without supervision, offering competitive performances to many state-of-the-art supervised methods in cross-dataset scenarios.
 
 ## Features
 - **Unsupervised Learning**: Utilizes deep auto-encoders to learn compressed representations of seismic waveforms, requiring minimal labeled data.
