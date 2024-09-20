@@ -2,10 +2,9 @@ from obspy import UTCDateTime
 import h5py
 import numpy as np
 import pandas as pd
-from tensorflow.keras.utils import Sequence
-from config import BATCH_SIZE, SAMPLING_FREQ, FREQMIN, FREQMAX
 from os.path import exists
-
+from tensorflow.keras.utils import Sequence
+from seismic_purifier import BATCH_SIZE, SAMPLING_FREQ, FREQMIN, FREQMAX
 
 class GeneratorWrapper(Sequence):
     """

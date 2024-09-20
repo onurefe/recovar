@@ -1,4 +1,4 @@
-from config import (
+from seismic_purifier import (
     BATCH_SIZE,
     KFOLD_SPLITS,
     DATASET_CHUNKS,
@@ -33,7 +33,6 @@ import pandas as pd
 import random
 import numpy as np
 from sklearn.model_selection import KFold
-
 
 class KFoldEnvironment:
     """

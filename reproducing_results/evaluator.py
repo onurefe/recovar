@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
-import h5py as h5
 from os.path import exists
-from kfold_tester import KFoldTester
-from directory import *
 from sklearn.metrics import (
     roc_curve,
 )
-
+from kfold_tester import KFoldTester
+from directory import *
 
 class TracesFilter:
     def __init__(self):
@@ -129,15 +127,14 @@ class Evaluator:
     def __init__(
         self,
         exp_name,
-        training_model_ctor,
-        monitoring_model_ctor,
+        representation_learning_model_class,
+        classifier_model_class,
         train_dataset,
         test_dataset,
         filters,
         epochs,
         split,
-        method_params,
-        metric,
+        method_params
     ):
         self.exp_name = exp_name
         self.train_dataset = train_dataset
@@ -146,123 +143,101 @@ class Evaluator:
         self.epochs = epochs
         self.split = split
         self.method_params = method_params
-        self.metric = metric
-        self.training_model_name = training_model_ctor().name
-        self.monitoring_model_name = monitoring_model_ctor().name
+        self.representation_learning_model_name = representation_learning_model_class().name
+        self.classifier_model_name = classifier_model_class().name
 
         self._add_tester(
-            training_model_ctor=training_model_ctor,
-            monitoring_model_ctor=monitoring_model_ctor,
+            representation_learning_model_class=representation_learning_model_class,
+            classifier_model_class=classifier_model_class,
         )
 
     def get_roc_vectors(
         self,
     ):
-        if not self._are_monitoring_files_present():
+        if not self._are_results_present():
             self.tester.test()
 
-        monitoring_meta = self._read_monitoring_meta()
-        monitoring_meta = self._apply_filters(monitoring_meta)
-        indexer = np.array(monitoring_meta.index)
+        df_meta = self._read_meta_file()
+        df_meta = self._apply_filters(df_meta)
+        indexer = np.array(df_meta.index)
 
         roc_vectors = []
         for epoch in self.epochs:
-            monitoring_data = self._read_monitoring_data(epoch)
-            monitoring_data = self._slice_monitoring_tensors(monitoring_data, indexer)
+            df_score = self._read_score_file(epoch)
+            df_score = df_score[indexer]
             tpr, fpr, thresholds = self._get_roc_vector(
-                monitoring_data, monitoring_meta
+                df_score, df_meta
             )
             roc_vectors.append({"tpr": tpr, "fpr": fpr, "thresholds": thresholds})
 
         return roc_vectors
 
-    def _get_roc_vector(self, monitoring_data, monitoring_meta):
-        metric = self.metric(monitoring_data)
-        labels = monitoring_meta["label"] == "eq"
-        fpr, tpr, thresholds = roc_curve(labels, metric)
+    def _get_roc_vector(self, df_score, df_meta):
+        labels = df_meta["label"] == "eq"
+        fpr, tpr, thresholds = roc_curve(labels, df_score["eq_probability"])
 
         return tpr, fpr, thresholds
 
-    def _slice_monitoring_tensors(self, monitoring_data, indexer):
-        for key in self.metric.monitored_params:
-            monitoring_data[key] = monitoring_data[key][indexer]
-
-        return monitoring_data
-
-    def _apply_filters(self, monitoring_meta):
-        _monitoring_meta = monitoring_meta.copy()
-        _monitoring_meta.reset_index(inplace=True)
+    def _apply_filters(self, metadata):
+        _metadata = metadata.copy()
+        _metadata.reset_index(inplace=True)
 
         for filter in self.filters:
-            _monitoring_meta = filter.apply(_monitoring_meta, self.test_dataset)
+            _metadata = filter.apply(_metadata, self.test_dataset)
 
-        _monitoring_meta = _monitoring_meta.sample(frac=1)
+        _metadata = _metadata.sample(frac=1)
+        return _metadata
 
-        return _monitoring_meta
-
-    def _read_monitoring_meta(self):
+    def _read_meta_file(self):
         return pd.read_csv(self._get_meta_file_path())
 
-    def _read_monitoring_data(self, epoch):
-        f = h5.File(
-            self._get_data_file_path(epoch),
-            "r",
-        )
+    def _read_score_file(self, epoch):
+        return pd.read_csv(self._get_score_file_path(epoch))
 
-        monitoring_data = {}
-        for key in self.metric.monitored_params:
-            monitoring_data[key] = np.array(f[key])
-
-        f.close()
-
-        return monitoring_data
-
-    def _add_tester(self, training_model_ctor, monitoring_model_ctor):
+    def _add_tester(self, representation_learning_model_class, classifier_model_class):
         self.tester = KFoldTester(
             self.exp_name,
-            training_ctor=training_model_ctor,
-            monitoring_ctor=monitoring_model_ctor,
+            representation_learning_model_class=representation_learning_model_class,
+            classifier_model_class=classifier_model_class,
             train_dataset=self.train_dataset,
             test_dataset=self.test_dataset,
             split=self.split,
             epochs=self.epochs,
-            monitored_params=self.metric.monitored_params,
             method_params=self.method_params,
         )
 
-    def _are_monitoring_files_present(self):
-        return self._are_data_files_present() and self._is_meta_file_present()
+    def _are_results_present(self):
+        return self._are_score_files_present() and self._is_meta_file_present()
 
-    def _are_data_files_present(self):
-        data_file_existances = []
+    def _are_score_files_present(self):
+        score_file_exists = []
 
         for epoch in self.epochs:
-            data_file_existances.append(exists(self._get_data_file_path(epoch)))
+            score_file_exists.append(exists(self._get_score_file_path(epoch)))
 
-        return np.array(data_file_existances).all()
+        return np.array(score_file_exists).all()
 
     def _is_meta_file_present(self):
         return exists(self._get_meta_file_path())
 
-    def _get_data_file_path(self, epoch):
-        data_file_path = get_monitoring_data_file_path(
+    def _get_score_file_path(self, epoch):
+        score_file_path = get_exp_results_score_file_path(
             self.exp_name,
-            self.training_model_name,
-            self.monitoring_model_name,
+            self.representation_learning_model_name,
+            self.classifier_model_name,
             self.train_dataset,
             self.test_dataset,
             self.split,
             epoch,
-            self.metric.monitored_params,
         )
 
-        return data_file_path
+        return score_file_path
 
     def _get_meta_file_path(self):
-        meta_file_path = get_monitoring_meta_file_path(
+        meta_file_path = get_exp_results_meta_file_path(
             self.exp_name,
-            self.training_model_name,
-            self.monitoring_model_name,
+            self.representation_learning_model_name,
+            self.classifier_model_name,
             self.train_dataset,
             self.test_dataset,
             self.split,

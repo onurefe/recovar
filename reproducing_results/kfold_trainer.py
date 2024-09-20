@@ -1,11 +1,9 @@
-from config import BATCH_SIZE
-from directory import *
+from seismic_purifier import BATCH_SIZE
 from kfold_environment import KFoldEnvironment
-from os.path import join
+from directory import *
 from os import makedirs
 import pandas as pd
 import tensorflow as tf
-
 
 class CheckpointCallback(tf.keras.callbacks.Callback):
     def __init__(self, exp_name, model, train_dataset, split):
@@ -19,7 +17,6 @@ class CheckpointCallback(tf.keras.callbacks.Callback):
             self.exp_name, self.model.name, self.train_dataset, self.split, epoch
         )
         self.model.save_weights(checkpoint_path)
-
 
 class KfoldTrainer:
     def __init__(

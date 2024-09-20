@@ -1,23 +1,99 @@
-from config import BATCH_SIZE
 import tensorflow as tf
 from tensorflow import keras
-import numpy as np
-from layers import AddNoise, NormalizeStd
-from building_blocks import AutoencoderBlock
-from utils import demean, l2_normalize, l2_distance
-
+from seismic_purifier.config import BATCH_SIZE
+from seismic_purifier.layers import AddNoise, NormalizeStd
+from seismic_purifier.utils import demean, l2_normalize, l2_distance
+from seismic_purifier.config import BATCH_SIZE
+from seismic_purifier.layers import (Downsample,
+                                     Upsample,
+                                     UpsampleNoactivation,
+                                     ResIdentity,
+                                     Padding)
 
 @tf.keras.utils.register_keras_serializable()
-class Autoencoder(keras.Model):
+class AutoencoderBlock(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
-    def __init__(self, name="autoencoder", input_noise_std=1e-6, *args, **kwargs):
-        super(Autoencoder, self).__init__(name=name, **kwargs)
+    def __init__(self, name="autoencoder_block", *args, **kwargs):
+        super(AutoencoderBlock, self).__init__(name=name, **kwargs)
+
+    def get_config(self):
+        config = super(AutoencoderBlock, self).get_config()
+        return config
+
+    def build(self, input_shape=None):  # Create the state of the layer (weights)
+        self.inp = keras.layers.InputLayer(
+            (self.N_TIMESTEPS, self.N_CHANNELS), batch_size=BATCH_SIZE
+        )
+
+        self.down1 = Downsample(8, 15, name="down_1")  # 3000 -> 1500
+        self.down2 = Downsample(16, 13, name="down_2")  # 1500 -> 750
+        self.pad1 = Padding([1, 1])  # 750 -> 752
+        self.down3 = Downsample(32, 11, name="down_3")  # 752 -> 376
+        self.down4 = Downsample(64, 9, name="down_4")  # 376 -> 188
+        self.down5 = Downsample(64, 7, name="down_5")  # 188 -> 94
+
+        self.resid1 = ResIdentity(64, 5, name="resid_1")
+        self.resid2 = ResIdentity(64, 5, name="resid_2")
+        self.resid3 = ResIdentity(64, 5, name="resid_3")
+        self.resid4 = ResIdentity(64, 5, name="resid_4")
+        self.resid5 = ResIdentity(64, 5, name="resid_5")
+
+        self.up1 = Upsample(32, 7, name="up_1")  # 94 -> 188
+        self.up2 = Upsample(16, 9, name="up_2")  # 188 -> 376
+        self.up3 = Upsample(8, 11, name="up_3")  # 376 -> 752
+        self.crop1 = tf.keras.layers.Cropping1D(cropping=(1, 1))  # 752 -> 750
+        self.up4 = Upsample(4, 13, name="up_4")  # 750 -> 1500
+        self.up5 = UpsampleNoactivation(3, 15, name="up_5")
+
+    def _encoder(self, x, training):
+        x = self.down1(x, training=training)
+        x = self.down2(x, training=training)
+        x = self.pad1(x)
+        x = self.down3(x, training=training)
+        x = self.down4(x, training=training)
+        x = self.down5(x, training=training)
+
+        x = self.resid1(x, training=training)
+        x = self.resid2(x, training=training)
+        x = self.resid3(x, training=training)
+        x = self.resid4(x, training=training)
+        x = self.resid5(x, training=training)
+
+        return x
+
+    def _decoder(self, x, training):
+        x = self.up1(x, training=training)
+        x = self.up2(x, training=training)
+        x = self.up3(x, training=training)
+        x = self.crop1(x)
+        x = self.up4(x, training=training)
+        x = self.up5(x, training=training)
+
+        return x
+
+    def call(self, inputs, training=False):
+        x = self.inp(inputs)
+        x = tf.cast(x, dtype=tf.float32)
+
+        f = self._encoder(x, training=training)
+        y = self._decoder(f, training=training)
+
+        return f, y
+    
+
+@tf.keras.utils.register_keras_serializable()
+class RepresentationLearningAutoencoder(keras.Model):
+    N_TIMESTEPS = 3000
+    N_CHANNELS = 3
+
+    def __init__(self, name="representation_learning_autoencoder", input_noise_std=1e-6, *args, **kwargs):
+        super(RepresentationLearningAutoencoder, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
 
     def get_config(self):
-        config = super(Autoencoder, self).get_config()
+        config = super(RepresentationLearningAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
@@ -49,24 +125,24 @@ class Autoencoder(keras.Model):
 
 
 @tf.keras.utils.register_keras_serializable()
-class DenoisingAutoencoder(keras.Model):
+class RepresentationLearningDenoisingAutoencoder(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
     def __init__(
         self,
-        name="denoising_autoencoder",
+        name="representation_learning_denoising_autoencoder",
         input_noise_std=1e-6,
         denoising_noise_std=2e-1,
         *args,
         **kwargs
     ):
-        super(DenoisingAutoencoder, self).__init__(name=name, **kwargs)
+        super(RepresentationLearningDenoisingAutoencoder, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
         self.denoising_noise_std = denoising_noise_std
 
     def get_config(self):
-        config = super(DenoisingAutoencoder, self).get_config()
+        config = super(RepresentationLearningDenoisingAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
@@ -110,24 +186,24 @@ class DenoisingAutoencoder(keras.Model):
 
 
 @tf.keras.utils.register_keras_serializable()
-class AutoencoderEnsemble(keras.Model):
+class RepresentationLearningAutoencoderEnsemble(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
     def __init__(
         self,
-        name="autoencoder_ensemble",
+        name="representation_learning_autoencoder_ensemble",
         input_noise_std=1e-6,
         eps=1e-27,
         *args,
         **kwargs
     ):
-        super(AutoencoderEnsemble, self).__init__(name=name, **kwargs)
+        super(RepresentationLearningAutoencoderEnsemble, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
         self.eps = eps
 
     def get_config(self):
-        config = super(AutoencoderEnsemble, self).get_config()
+        config = super(RepresentationLearningAutoencoderEnsemble, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
