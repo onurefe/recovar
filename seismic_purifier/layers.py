@@ -229,6 +229,7 @@ class CrossCovarianceCircular(tf.keras.layers.Layer):
         c = tf.signal.ifft(cw)
 
         # Cast back to lower precision and then center the cross covariance function.
+        c = tf.math.real(c)
         c = tf.cast(c, tf.float32)
         c = tf.roll(c, shift=(timesteps) // 2, axis=2)
 

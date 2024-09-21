@@ -1,0 +1,21 @@
+{ 
+    "CONFIG": {
+        "SUBSAMPLING_FACTOR":1.0,
+        "TRAIN_VALIDATION_SPLIT": 0.75,
+        "KFOLD_SPLITS": 5,
+        "DATASET_CHUNKS": 20,
+        "PHASE_PICK_ENSURED_CROP_RATIO": 0.6666666,
+        "PHASE_ENSURING_MARGIN":3.0
+    },
+    "DATASET_DIRECTORIES": {
+        "STEAD_WAVEFORMS_HDF5_PATH": "/home/onur/seismic_purifier_data/data/stead/waveforms.hdf5",
+        "STEAD_METADATA_CSV_PATH": "/home/onur/seismic_purifier_data/data/stead/metadata.csv",
+        "INSTANCE_NOISE_WAVEFORMS_HDF5_PATH": "/home/onur/seismic_purifier_data/data/instance/noise/waveforms.hdf5",
+        "INSTANCE_EQ_WAVEFORMS_HDF5_PATH": "/home/onur/seismic_purifier_data/data/instance/events/waveforms.hdf5",
+        "INSTANCE_NOISE_METADATA_CSV_PATH": "/home/onur/seismic_purifier_data/data/instance/noise/metadata.csv",
+        "INSTANCE_EQ_METADATA_CSV_PATH": "/home/onur/seismic_purifier_data/data/instance/events/metadata.csv"
+    },
+    "PREPROCESSED_DATASET_DIRECTORY": "/home/onur/seismic_purifier_data/data_preprocessed",
+    "TRAINED_MODELS_DIR": "/home/onur/seismic_purifier_models",
+    "RESULTS_DIR": "/home/onur/Desktop/GitRepos/SeismicPurifier/reproducibility/results"
+}

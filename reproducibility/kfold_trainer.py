@@ -22,7 +22,7 @@ class KfoldTrainer:
     def __init__(
         self,
         exp_name,
-        model_ctor,
+        model_class,
         dataset,
         split,
         epochs,
@@ -32,7 +32,7 @@ class KfoldTrainer:
         beta_2=0.999,
     ):
         self.exp_name = exp_name
-        self.model_ctor = model_ctor
+        self.model_class = model_class
         self.dataset = dataset
         self.split = split
         self.epochs = epochs
@@ -41,7 +41,7 @@ class KfoldTrainer:
         self.beta_1 = beta_1
         self.beta_2 = beta_2
 
-        self.model_name = model_ctor().name
+        self.model_name = model_class().name
 
     def train(
         self,
@@ -95,7 +95,7 @@ class KfoldTrainer:
         return fit_result
 
     def _create_model(self):
-        model = self.model_ctor()
+        model = self.model_class()
         model.compile(
             optimizer=tf.keras.optimizers.Adam(
                 learning_rate=self.learning_rate,

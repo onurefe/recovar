@@ -9,7 +9,7 @@ from itertools import combinations
 
 def gaussian_window(timesteps, sigma=1.25, axis=1):
     t = np.expand_dims(
-        np.linspace(-timesteps//2, timesteps//2, timesteps), axis=0
+        np.linspace(-timesteps/2., timesteps/2., timesteps), axis=0
     )
     g = np.exp(-np.power(t, 2.0) / (2 * np.power(sigma, 2.0)))
     return g / np.sum(g, axis=axis, keepdims=True)
@@ -17,7 +17,7 @@ def gaussian_window(timesteps, sigma=1.25, axis=1):
 def eq_metric(fcov):
     n_timesteps = np.shape(fcov)[1]
     g = gaussian_window(n_timesteps)
-    z = np.maximum(np.sum(fcov * g, axis=1), 0)
+    z = np.maximum(np.mean(fcov * g, axis=1), 0)
     return (1. - np.exp(-z))
     
 class ClassifierAutocovariance(keras.Model):

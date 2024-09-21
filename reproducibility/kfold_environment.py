@@ -1,4 +1,4 @@
-from seismic_purifier import (
+from config import (
     BATCH_SIZE,
     KFOLD_SPLITS,
     DATASET_CHUNKS,

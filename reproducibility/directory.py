@@ -1,19 +1,21 @@
 from os.path import join
+import json
+import os
 
-HOME_DIR = "."
-STEAD_DIR = "./data/stead"
-INSTANCE_DIR = "./data/instance"
-TRAINED_MODELS_DIR = f"{HOME_DIR}/trained_models"
-RESULTS_DIR = f"{HOME_DIR}/results"
-PLOTS_DIR = f"{HOME_DIR}/plots"
+# Load the JSON data
+with open("reproducibility/settings.json", 'r') as file:
+    settings = json.load(file)
+    
+STEAD_WAVEFORMS_HDF5_PATH = settings["DATASET_DIRECTORIES"]["STEAD_WAVEFORMS_HDF5_PATH"]
+STEAD_METADATA_CSV_PATH = settings["DATASET_DIRECTORIES"]["STEAD_METADATA_CSV_PATH"]
+INSTANCE_NOISE_WAVEFORMS_HDF5_PATH = settings["DATASET_DIRECTORIES"]["INSTANCE_NOISE_WAVEFORMS_HDF5_PATH"]
+INSTANCE_EQ_WAVEFORMS_HDF5_PATH = settings["DATASET_DIRECTORIES"]["INSTANCE_EQ_WAVEFORMS_HDF5_PATH"]
+INSTANCE_NOISE_METADATA_CSV_PATH = settings["DATASET_DIRECTORIES"]["INSTANCE_NOISE_METADATA_CSV_PATH"]
+INSTANCE_EQ_METADATA_CSV_PATH = settings["DATASET_DIRECTORIES"]["INSTANCE_EQ_METADATA_CSV_PATH"]
 
-STEAD_WAVEFORMS_HDF5_PATH = f"{STEAD_DIR}/waveforms.hdf5"
-STEAD_METADATA_CSV_PATH = f"{STEAD_DIR}/metadata.csv"
-
-INSTANCE_NOISE_WAVEFORMS_HDF5_PATH = f"{INSTANCE_DIR}/noise/waveforms.hdf5"
-INSTANCE_EQ_WAVEFORMS_HDF5_PATH = f"{INSTANCE_DIR}/events/waveforms.hdf5"
-INSTANCE_NOISE_METADATA_CSV_PATH = f"{INSTANCE_DIR}/noise/metadata.csv"
-INSTANCE_EQ_METADATA_CSV_PATH = f"{INSTANCE_DIR}/events/metadata.csv"
+PREPROCESSED_DATASET_DIRECTORY = settings["PREPROCESSED_DATASET_DIRECTORY"]
+RESULTS_DIR = settings["RESULTS_DIR"]
+TRAINED_MODELS_DIR = settings["TRAINED_MODELS_DIR"]
 
 def get_exp_results_dir(
     exp_name,
@@ -63,16 +65,16 @@ def get_exp_results_score_file_path(
     split,
     epoch,
 ):
-    output_dir = get_exp_results_score_file_path(
+    output_dir = get_exp_results_dir(
         exp_name,
         representation_learning_model_name,
         classification_model_name,
         train_dataset,
         test_dataset,
-        split,
+        split
     )
 
-    filename = "epoch{}.hdf5".format(epoch)
+    filename = "scores{}.csv".format(epoch)
 
     return join(output_dir, filename)
 

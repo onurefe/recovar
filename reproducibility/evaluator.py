@@ -6,6 +6,7 @@ from sklearn.metrics import (
 )
 from kfold_tester import KFoldTester
 from directory import *
+from config import SAMPLING_FREQ, PHASE_ENSURING_MARGIN, WINDOW_SIZE
 
 class TracesFilter:
     def __init__(self):
@@ -84,10 +85,10 @@ class SNRFilter(TracesFilter):
 class CropOffsetFilter(TracesFilter):
     def __init__(
         self,
-        min_before_p_arrival_in_seconds,
-        min_after_p_arrival_in_seconds,
-        window_size_in_seconds,
-        sampling_frequency,
+        min_before_p_arrival_in_seconds=PHASE_ENSURING_MARGIN,
+        min_after_p_arrival_in_seconds=PHASE_ENSURING_MARGIN,
+        window_size_in_seconds=WINDOW_SIZE,
+        sampling_frequency=SAMPLING_FREQ,
     ):
         self.min_before_p_arrival_in_samples = int(
             sampling_frequency * min_before_p_arrival_in_seconds
@@ -164,7 +165,7 @@ class Evaluator:
         roc_vectors = []
         for epoch in self.epochs:
             df_score = self._read_score_file(epoch)
-            df_score = df_score[indexer]
+            df_score = df_score.iloc[indexer]
             tpr, fpr, thresholds = self._get_roc_vector(
                 df_score, df_meta
             )
@@ -174,7 +175,7 @@ class Evaluator:
 
     def _get_roc_vector(self, df_score, df_meta):
         labels = df_meta["label"] == "eq"
-        fpr, tpr, thresholds = roc_curve(labels, df_score["eq_probability"])
+        fpr, tpr, thresholds = roc_curve(labels, df_score["eq_probabilities"])
 
         return tpr, fpr, thresholds
 
@@ -183,7 +184,7 @@ class Evaluator:
         _metadata.reset_index(inplace=True)
 
         for filter in self.filters:
-            _metadata = filter.apply(_metadata, self.test_dataset)
+            _metadata = filter.apply(_metadata)
 
         _metadata = _metadata.sample(frac=1)
         return _metadata

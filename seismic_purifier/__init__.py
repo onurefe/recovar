@@ -12,18 +12,7 @@ from .classifier_models import (
 
 from .config import (
     BATCH_SIZE,
-    SAMPLING_FREQ,
-    INSTANCE_TIME_WINDOW,
-    STEAD_TIME_WINDOW,
-    SUBSAMPLING_FACTOR,
-    TRAIN_VALIDATION_SPLIT,
-    KFOLD_SPLITS,
-    DATASET_CHUNKS,
-    PHASE_PICK_ENSURED_CROP_RATIO,
-    PHASE_ENSURING_MARGIN,
-    FREQMIN,
-    FREQMAX,
-    N_CHANNELS
+    SAMPLING_FREQ
 )
 
 from .cubic_interpolation import diff, cubic_interp1d
@@ -55,18 +44,7 @@ __all__ = [
     
     # Configuration Constants
     'BATCH_SIZE',
-    'SAMPLING_FREQ',
-    'INSTANCE_TIME_WINDOW',
-    'STEAD_TIME_WINDOW',
-    'SUBSAMPLING_FACTOR',
-    'TRAIN_VALIDATION_SPLIT',
-    'KFOLD_SPLITS',
-    'DATASET_CHUNKS',
-    'PHASE_PICK_ENSURED_CROP_RATIO',
-    'PHASE_ENSURING_MARGIN',
-    'FREQMIN',
-    'FREQMAX',
-    'N_CHANNELS',
+    'SAMPLING_FREQ'
     
     # Version Information
     '__version__'

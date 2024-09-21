@@ -3,6 +3,7 @@ import tensorflow as tf
 from os import makedirs
 from seismic_purifier import BATCH_SIZE
 from kfold_environment import KFoldEnvironment
+import numpy as np
 from directory import *
 
 class KFoldTester:
@@ -33,19 +34,29 @@ class KFoldTester:
     def test(
         self,
     ):
-        monitoring_output_dir = self._get_monitoring_output_dir()
+        exp_results_dir = self._get_exp_results_dir()
 
-        makedirs(monitoring_output_dir, exist_ok=True)
+        makedirs(exp_results_dir, exist_ok=True)
         __, __, __, predict_gen = self.test_environment.get_generators(self.split)
 
         for epoch in self.epochs:
-            monitoring_model = self._create_monitoring_model(epoch)
-            monitoring_dict = monitoring_model.predict(predict_gen)
-            self._save_data_file(monitoring_dict, epoch)
+            classifier_model = self._create_classifier_model(epoch)
+            scores = self._predict(classifier_model, predict_gen)
+            self._save_score_file(scores, epoch)
 
         __, __, metadata = self.test_environment.get_split_metadata(self.split)
         self._save_meta_file(metadata)
 
+    def _predict(self, classifier_model, predict_gen):
+        outputs = []
+        for i in range(predict_gen.__len__()):
+            x = predict_gen.__getitem__(i)
+            y = classifier_model(x)
+            outputs.append(y)
+        
+        output = np.concatenate(outputs, axis=0)
+        return output
+    
     def _save_score_file(self, scores, epoch):
         score_file_path = get_exp_results_score_file_path(
             self.exp_name,
@@ -54,8 +65,7 @@ class KFoldTester:
             self.train_dataset,
             self.test_dataset,
             self.split,
-            epoch,
-            self.monitored_params,
+            epoch
         )
 
         df_score = pd.DataFrame({"eq_probabilities":scores})
@@ -103,7 +113,6 @@ class KFoldTester:
 
         classifier_model = self.classifer_model_class(
             representation_learning_model,
-            monitored_params=self.monitored_params,
             method_params=self.method_params,
         )
         return classifier_model
@@ -111,7 +120,7 @@ class KFoldTester:
     def _add_test_environment(self):
         self.test_environment = KFoldEnvironment(self.test_dataset)
 
-    def _get_output_dir(self):
+    def _get_exp_results_dir(self):
         return get_exp_results_dir(
             self.exp_name,
             self.representation_learning_model_name,
