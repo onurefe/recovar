@@ -3,7 +3,7 @@ import json
 import os
 
 # Load the JSON data
-with open("reproducibility/settings.json", 'r') as file:
+with open("settings.json", 'r') as file:
     settings = json.load(file)
 
 """ After splitting the dataset into chunks, we split each chunk into training, validation and test sets.

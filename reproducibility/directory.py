@@ -3,7 +3,7 @@ import json
 import os
 
 # Load the JSON data
-with open("reproducibility/settings.json", 'r') as file:
+with open("settings.json", 'r') as file:
     settings = json.load(file)
     
 STEAD_WAVEFORMS_HDF5_PATH = settings["DATASET_DIRECTORIES"]["STEAD_WAVEFORMS_HDF5_PATH"]
