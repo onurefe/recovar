@@ -19,7 +19,7 @@ def eq_metric(fcov):
     g = gaussian_window(n_timesteps)
     z = np.maximum(np.mean(fcov * g, axis=1), 0)
     return (1. - np.exp(-z))
-    
+
 class ClassifierAutocovariance(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
