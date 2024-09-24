@@ -149,7 +149,9 @@ After the training the models, you can test different method performances by usi
 If your dataset is compatible with the structure of either INSTANCE or STEAD datasets, you can use all machinery under the folder **reproducibility**. Or, a different option could be converting your data
 into STEAD dataset format by using [QuakeLabeler](https://maihao14.github.io/QuakeLabeler/) or [SeisBench](https://github.com/seisbench/seisbench).
 
-For other types of data, it's possible to feed numpy arrays directly for training. **SeismicPurifier/example.ipynb** provides example for this case.
+For other types of data, it's possible to feed numpy arrays directly for training. **SeismicPurifier/model_train.ipynb** provides example for this case. You can also test your data as well. Please 
+check **SeismicPurifier/model_test.ipynb**. For training and testing, pretrained models are stored in **SeismicPurifier/models** folder. Besides, **SeismicPurifier/data** involves small dataset
+for experimenting. 
 
 ## License
 This project is licensed under the MIT License.
