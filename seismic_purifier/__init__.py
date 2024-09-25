@@ -1,13 +1,13 @@
 from .representation_learning_models import (
-    RepresentationLearningAutoencoder, 
-    RepresentationLearningDenoisingAutoencoder, 
-    RepresentationLearningAutoencoderEnsemble
+    RepresentationLearningSingleAutoencoder, 
+    RepresentationLearningDenoisingSingleAutoencoder, 
+    RepresentationLearningMultipleAutoencoder
 )
 
 from .classifier_models import (
     ClassifierAutocovariance, 
-    ClassifierAugmentationCrossCovariances, 
-    ClassifierRepresentationCrossCovariances
+    ClassifierAugmentedAutoencoder, 
+    ClassifierMultipleAutoencoder
 )
 
 from .config import (
@@ -33,14 +33,14 @@ from .layers import (
 
 __all__ = [
     # Representation Learning Models
-    'RepresentationLearningAutoencoder',
-    'RepresentationLearningDenoisingAutoencoder',
-    'RepresentationLearningAutoencoderEnsemble',
+    'RepresentationLearningSingleAutoencoder',
+    'RepresentationLearningDenoisingSingleAutoencoder',
+    'RepresentationLearningMultipleAutoencoder',
     
     # Classifier Models
     'ClassifierAutocovariance',
-    'ClassifierAugmentationCrossCovariances',
-    'ClassifierRepresentationCrossCovariances',
+    'ClassifierAugmentedAutoencoder',
+    'ClassifierMultipleAutoencoder',
     
     # Configuration Constants
     'BATCH_SIZE',

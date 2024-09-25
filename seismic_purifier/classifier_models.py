@@ -51,7 +51,7 @@ class ClassifierAutocovariance(keras.Model):
 
         return eq_metric(fcov)
 
-class ClassifierAugmentationCrossCovariances(keras.Model):
+class ClassifierAugmentedAutoencoder(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
     TIME_WINDOW = 30
@@ -64,12 +64,12 @@ class ClassifierAugmentationCrossCovariances(keras.Model):
         *args,
         **kwargs
     ):
-        super(ClassifierAugmentationCrossCovariances, self).__init__(name=name, **kwargs)
+        super(ClassifierAugmentedAutoencoder, self).__init__(name=name, **kwargs)
         self.model = model
         self.method_params = method_params
 
     def get_config(self):
-        config = super(ClassifierAugmentationCrossCovariances, self).get_config()
+        config = super(ClassifierAugmentedAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):
@@ -150,7 +150,7 @@ class ClassifierAugmentationCrossCovariances(keras.Model):
         fcov = self._cross_covariance_ensemble_mean(augmented_f)
         return eq_metric(fcov)
 
-class ClassifierRepresentationCrossCovariances(keras.Model):
+class ClassifierMultipleAutoencoder(keras.Model):
     def __init__(
         self,
         model=None,
@@ -159,11 +159,11 @@ class ClassifierRepresentationCrossCovariances(keras.Model):
         *args,
         **kwargs
     ):
-        super(ClassifierRepresentationCrossCovariances, self).__init__(name=name, **kwargs)
+        super(ClassifierMultipleAutoencoder, self).__init__(name=name, **kwargs)
         self.model = model
 
     def get_config(self):
-        config = super(ClassifierRepresentationCrossCovariances, self).get_config()
+        config = super(ClassifierMultipleAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):

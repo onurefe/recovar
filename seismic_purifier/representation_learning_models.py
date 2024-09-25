@@ -83,16 +83,16 @@ class AutoencoderBlock(keras.Model):
     
 
 @tf.keras.utils.register_keras_serializable()
-class RepresentationLearningAutoencoder(keras.Model):
+class RepresentationLearningSingleAutoencoder(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
     def __init__(self, name="representation_learning_autoencoder", input_noise_std=1e-6, *args, **kwargs):
-        super(RepresentationLearningAutoencoder, self).__init__(name=name, **kwargs)
+        super(RepresentationLearningSingleAutoencoder, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
 
     def get_config(self):
-        config = super(RepresentationLearningAutoencoder, self).get_config()
+        config = super(RepresentationLearningSingleAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
@@ -124,7 +124,7 @@ class RepresentationLearningAutoencoder(keras.Model):
 
 
 @tf.keras.utils.register_keras_serializable()
-class RepresentationLearningDenoisingAutoencoder(keras.Model):
+class RepresentationLearningDenoisingSingleAutoencoder(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
@@ -136,12 +136,12 @@ class RepresentationLearningDenoisingAutoencoder(keras.Model):
         *args,
         **kwargs
     ):
-        super(RepresentationLearningDenoisingAutoencoder, self).__init__(name=name, **kwargs)
+        super(RepresentationLearningDenoisingSingleAutoencoder, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
         self.denoising_noise_std = denoising_noise_std
 
     def get_config(self):
-        config = super(RepresentationLearningDenoisingAutoencoder, self).get_config()
+        config = super(RepresentationLearningDenoisingSingleAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
@@ -185,7 +185,7 @@ class RepresentationLearningDenoisingAutoencoder(keras.Model):
 
 
 @tf.keras.utils.register_keras_serializable()
-class RepresentationLearningAutoencoderEnsemble(keras.Model):
+class RepresentationLearningMultipleAutoencoder(keras.Model):
     N_TIMESTEPS = 3000
     N_CHANNELS = 3
 
@@ -197,12 +197,12 @@ class RepresentationLearningAutoencoderEnsemble(keras.Model):
         *args,
         **kwargs
     ):
-        super(RepresentationLearningAutoencoderEnsemble, self).__init__(name=name, **kwargs)
+        super(RepresentationLearningMultipleAutoencoder, self).__init__(name=name, **kwargs)
         self.input_noise_std = input_noise_std
         self.eps = eps
 
     def get_config(self):
-        config = super(RepresentationLearningAutoencoderEnsemble, self).get_config()
+        config = super(RepresentationLearningMultipleAutoencoder, self).get_config()
         return config
 
     def build(self, input_shape=None):  # Create the state of the layer (weights)
