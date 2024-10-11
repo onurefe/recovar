@@ -1,4 +1,4 @@
-# ReCovar
+# RECOVAR
 
 [![arXiv](https://img.shields.io/badge/arXiv-2407.18402v1-b31b1b.svg)](https://arxiv.org/abs/2407.18402)
 
@@ -14,7 +14,7 @@
 
 ## Table of Contents
 
-- [SeismicPurifier:](#symmetry-lens)
+- [Recovar:](#recovar)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
     - [Prerequisites](#prerequisites)
