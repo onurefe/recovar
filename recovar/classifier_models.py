@@ -1,10 +1,10 @@
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-from seismic_purifier.config import BATCH_SIZE, SAMPLING_FREQ
-from seismic_purifier.layers import CrossCovarianceCircular
-from seismic_purifier.cubic_interpolation import cubic_interp1d
-from seismic_purifier.utils import l2_normalize
+from recovar.config import BATCH_SIZE, SAMPLING_FREQ
+from recovar.layers import CrossCovarianceCircular
+from recovar.cubic_interpolation import cubic_interp1d
+from recovar.utils import l2_normalize
 from itertools import combinations
 
 def gaussian_window(timesteps, sigma=1.25, axis=1):

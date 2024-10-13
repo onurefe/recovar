@@ -7,14 +7,14 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 setup(
-    name='SeismicPurifier',  # Replace with your package name
+    name='recovar',  # Replace with your package name
     version='0.1.0',      # Initial release version
     author='Onur Efe',
     author_email='onur.efe44@gmail.com',
     description='',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='git@github.com:onurefe/SeismicPurifier.git',
+    url='git@github.com:onurefe/recovar.git',
     packages=find_packages(),
     install_requires=[
         'tensorflow==2.14.0',

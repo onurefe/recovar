@@ -1,9 +1,9 @@
 import tensorflow as tf
 from tensorflow import keras
-from seismic_purifier.config import BATCH_SIZE
-from seismic_purifier.layers import AddNoise, NormalizeStd
-from seismic_purifier.utils import demean, l2_normalize, l2_distance
-from seismic_purifier.layers import (Downsample,
+from recovar.config import BATCH_SIZE
+from recovar.layers import AddNoise, NormalizeStd
+from recovar.utils import demean, l2_normalize, l2_distance
+from recovar.layers import (Downsample,
                                      Upsample,
                                      UpsampleNoactivation,
                                      ResIdentity,

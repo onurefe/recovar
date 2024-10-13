@@ -1,6 +1,4 @@
-from os.path import join
 import json
-import os
 
 # Load the JSON data
 with open("settings.json", 'r') as file:
