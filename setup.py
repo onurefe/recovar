@@ -27,7 +27,7 @@ setup(
         'License :: OSI Approved :: MIT License',  # Change if using a different license
         'Operating System :: OS Independent',
     ],
-    python_requires='==3.10',
+    python_requires='>=3.10,<3.11',
     include_package_data=True,
     entry_points={
     },

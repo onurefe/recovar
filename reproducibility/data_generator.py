@@ -156,7 +156,7 @@ class BatchGenerator:
             waveform = {}
             if row["label"] == "eq":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["station_name"]
+                waveform["station_name"] = row["receiver_code"] #Temporary fix
                 waveform["trace_start_time"] = self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -167,7 +167,7 @@ class BatchGenerator:
 
             if row["label"] == "no":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["station_name"]
+                waveform["station_name"] = row["receiver_code"] #Temporary fix
                 waveform["trace_start_time"]: self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -439,7 +439,7 @@ class DataGenerator(Sequence):
                     batch_metadata=self.chunk_metadata_list[chunk_idx],
                     eq_hdf5_path=self.bg_kwargs["eq_hdf5_path"],
                     no_hdf5_path=self.bg_kwargs["no_hdf5_path"],
-                    meta_parser=self.bg_kwargs["meta_parser"],
+                    #meta_parser=self.bg_kwargs["meta_parser"],
                     dataset_time_window=self.dataset_time_window,
                     model_time_window=self.model_time_window,
                     sampling_freq=self.sampling_freq,
