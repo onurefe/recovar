@@ -439,7 +439,6 @@ class DataGenerator(Sequence):
                     batch_metadata=self.chunk_metadata_list[chunk_idx],
                     eq_hdf5_path=self.bg_kwargs["eq_hdf5_path"],
                     no_hdf5_path=self.bg_kwargs["no_hdf5_path"],
-                    #meta_parser=self.bg_kwargs["meta_parser"],
                     dataset_time_window=self.dataset_time_window,
                     model_time_window=self.model_time_window,
                     sampling_freq=self.sampling_freq,
