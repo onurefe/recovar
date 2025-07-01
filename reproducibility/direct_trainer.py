@@ -129,7 +129,6 @@ class DirectTrainer:
               batch_size: int = BATCH_SIZE,
               learning_rate: float = 1e-3):
         
-        # Create data generators
         train_gen = HDF5DataGenerator(train_dataset_path, batch_size, shuffle=True)
         val_gen = HDF5DataGenerator(val_dataset_path, batch_size, shuffle=False)
         
@@ -137,10 +136,8 @@ class DirectTrainer:
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer)
         
-        # Create checkpoint directory
         Path("checkpoints").mkdir(exist_ok=True)
         
-        # Simple callbacks
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint(
                 'checkpoints/best_model.h5',
@@ -164,7 +161,6 @@ class DirectTrainer:
             )
         ]
         
-        # Train
         print("\nStarting training...")
         print(f"Train samples: {len(train_gen) * batch_size}")
         print(f"Val samples: {len(val_gen) * batch_size}")
@@ -374,7 +370,6 @@ class DirectTrainer:
         print(f"Total samples: {len(metadata)} (EQ: {(metadata['label']=='eq').sum()}, "
               f"NO: {(metadata['label']=='no').sum()})")
         
-        # Use existing BatchGenerator for preprocessing
         batch_gen = BatchGenerator(
             batch_size=BATCH_SIZE,
             batch_metadata=metadata,
@@ -385,7 +380,7 @@ class DirectTrainer:
             sampling_freq=self.sampling_freq,
             freqmin=FREQMIN,
             freqmax=FREQMAX,
-            last_axis="channels"  # or "timesteps" depending on dataset
+            last_axis="channels"  # or "timesteps" depending on dataset -> change this
         )
         
         n_batches = batch_gen.num_batches()
@@ -393,7 +388,6 @@ class DirectTrainer:
         
         # Create output HDF5 file
         with h5py.File(output_path, 'w') as f:
-            # Create datasets
             f.create_dataset('X', (n_samples, 3000, 3), dtype='float32')
             f.create_dataset('y', (n_samples,), dtype='int32')
             
@@ -419,15 +413,12 @@ class DirectTrainer:
 
 
   
-class HDF5DataGenerator(tf.keras.utils.Sequence):
-    """Simple generator for preprocessed HDF5 datasets"""
-    
+class HDF5DataGenerator(tf.keras.utils.Sequence):    
     def __init__(self, hdf5_path: str, batch_size: int, shuffle: bool = True):
         self.hdf5_path = hdf5_path
         self.batch_size = batch_size
         self.shuffle = shuffle
         
-        # Check if file exists
         if not Path(hdf5_path).exists():
             raise FileNotFoundError(f"Dataset not found: {hdf5_path}")
         
