@@ -60,11 +60,22 @@ class DirectTrainer:
     def create_subsampled_datasets(self,
                                 dataset: str,
                                 output_dir: str,
-                                noise_event_ratios: List[float] = [0.5, 0.7, 1.0],
-                                subsampling_factor: float = 1.0):
-        """Create datasets with different noise/event ratios"""
+                                noise_percentages: List[float] = None,
+                                subsampling_factor: float = 1.0,
+                                maintain_constant_size: bool = True):
+        """
+        Create datasets with different noise percentages
         
-        # Load and parse metadata based on dataset type
+        Args:
+            dataset: Dataset name ('stead' or 'instance')
+            output_dir: Output directory for preprocessed datasets
+            noise_percentages: List of noise percentages (0.0 to 100.0)
+                            Example: [0, 25, 50, 75, 100] for 0%, 25%, 50%, 75%, 100% noise
+                            If None, creates full dataset with all available samples
+            subsampling_factor: Factor to subsample the original dataset (0.0 to 1.0)
+            maintain_constant_size: If True, all datasets will have the same size (LCD)
+        """
+        
         if dataset == "stead": 
             metadata = self._parse_stead_metadata(STEAD_METADATA_CSV_PATH)
             eq_hdf5_path = STEAD_WAVEFORMS_HDF5_PATH
@@ -79,47 +90,108 @@ class DirectTrainer:
         else:
             raise ValueError(f"Unknown dataset: {dataset}")
         
-        # Separate earthquake and noise samples
         eq_metadata = metadata[metadata['label'] == 'eq'].copy()
         no_metadata = metadata[metadata['label'] == 'no'].copy()
         
         print(f"Total samples before subsampling: EQ={len(eq_metadata)}, NO={len(no_metadata)}")
         
-        # Apply subsampling if needed
         if subsampling_factor < 1.0:
             eq_metadata = eq_metadata.sample(frac=subsampling_factor, random_state=42)
             no_metadata = no_metadata.sample(frac=subsampling_factor, random_state=42)
-            print(f"After subsampling ({subsampling_factor*100}%): EQ={len(eq_metadata)}, NO={len(no_metadata)}")
+            print(f"After subsampling ({subsampling_factor*100:.0f}%): EQ={len(eq_metadata)}, NO={len(no_metadata)}")
         
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        # Create datasets for each noise/event ratio
-        for ne_ratio in noise_event_ratios:
-            n_eq = len(eq_metadata)
-            n_no = int(n_eq * ne_ratio)
-            
-            # Subsample noise to match ratio
-            if n_no > len(no_metadata):
-                print(f"Warning: Not enough noise samples for ratio {ne_ratio}")
-                n_no = len(no_metadata)
-            
-            no_subset = no_metadata.sample(n=n_no, random_state=42)
-            
-            # Combine and shuffle
-            combined_metadata = pd.concat([eq_metadata, no_subset])
+        if noise_percentages is None or len(noise_percentages) == 0:
+            print("No noise percentages specified. Creating full dataset with all available samples...")
+            combined_metadata = pd.concat([eq_metadata, no_metadata])
             combined_metadata = combined_metadata.sample(frac=1, random_state=42).reset_index(drop=True)
-            
-            # Assign crop offsets using existing logic exactly as is
             combined_metadata = self._assign_crop_offsets(combined_metadata)
             
-            # Save preprocessed dataset
-            output_file = f"SUBSAMPLED_{int(subsampling_factor*100)}_NE_{int(ne_ratio*100)}.hdf5"
+            output_file = f"FULL_DATASET_SUBSAMPLED_{int(subsampling_factor*100)}.hdf5"
             self._save_preprocessed_dataset(
                 combined_metadata,
                 eq_hdf5_path,
                 no_hdf5_path,
                 Path(output_dir) / output_file
             )
+            print(f"Created full dataset: EQ={len(eq_metadata)}, NO={len(no_metadata)}, Total={len(combined_metadata)}")
+            return
+        
+        for pct in noise_percentages:
+            if not 0 <= pct <= 100:
+                raise ValueError(f"Noise percentage must be between 0 and 100, got {pct}")
+        
+        if maintain_constant_size:
+            # The LCD is the minimum of available samples
+            # If we need percentages from 0-100%, we're limited by the minority class 
+            # (noise for stead/instance, event for continuous data)
+            lcd_size = min(len(no_metadata), len(eq_metadata))
+            print(f"\nLeast common denominator (constant dataset size): {lcd_size}")
+        
+        # Create datasets for each noise percentage
+        for noise_pct in noise_percentages:
+            if maintain_constant_size:
+                # Use LCD size
+                total_size = min(len(no_metadata), len(eq_metadata))
+                n_no = int(total_size * (noise_pct / 100.0))
+                n_eq = total_size - n_no
+            else:
+                if noise_pct == 0:
+                    # All earthquakes, no noise
+                    n_no = 0
+                    n_eq = len(eq_metadata)
+                elif noise_pct == 100:
+                    # All noise, no earthquakes
+                    n_no = len(no_metadata)
+                    n_eq = 0
+                else:
+                    # Mixed: calculate maximum possible size
+                    # If we want X% noise, then (100-X)% must be earthquakes
+                    # Total size is limited by: min(no_samples/(X/100), eq_samples/((100-X)/100))
+                    noise_frac = noise_pct / 100.0
+                    eq_frac = 1 - noise_frac
+                    
+                    max_from_noise = len(no_metadata) / noise_frac if noise_frac > 0 else float('inf')
+                    max_from_eq = len(eq_metadata) / eq_frac if eq_frac > 0 else float('inf')
+                    
+                    total_size = int(min(max_from_noise, max_from_eq))
+                    n_no = int(total_size * noise_frac)
+                    n_eq = total_size - n_no
+            
+            # Ensure we don't exceed available samples
+            n_no = min(n_no, len(no_metadata))
+            n_eq = min(n_eq, len(eq_metadata))
+            
+            # Sample the data
+            if n_eq > 0:
+                eq_subset = eq_metadata.sample(n=n_eq, random_state=42)
+            else:
+                eq_subset = pd.DataFrame()
+                
+            if n_no > 0:
+                no_subset = no_metadata.sample(n=n_no, random_state=42)
+            else:
+                no_subset = pd.DataFrame()
+            
+            # Combine and shuffle
+            combined_metadata = pd.concat([eq_subset, no_subset])
+            if len(combined_metadata) > 0:
+                combined_metadata = combined_metadata.sample(frac=1, random_state=42).reset_index(drop=True)
+                combined_metadata = self._assign_crop_offsets(combined_metadata)
+                
+                output_file = f"SUBSAMPLED_{int(subsampling_factor*100)}_NOISE_{int(noise_pct)}.hdf5"
+                self._save_preprocessed_dataset(
+                    combined_metadata,
+                    eq_hdf5_path,
+                    no_hdf5_path,
+                    Path(output_dir) / output_file
+                )
+                
+                # Calculate actual percentage for verification
+                actual_noise_pct = (n_no / (n_no + n_eq) * 100) if (n_no + n_eq) > 0 else 0
+                print(f"Created dataset with {noise_pct}% noise (actual: {actual_noise_pct:.1f}%): "
+                    f"EQ={n_eq}, NO={n_no}, Total={n_eq + n_no}")
       
     def train(self,
               model,
