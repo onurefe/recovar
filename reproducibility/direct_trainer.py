@@ -56,13 +56,14 @@ class DirectTrainer:
         self.phase_ensured_crop_ratio = phase_ensured_crop_ratio
         self.stead_time_window = stead_time_window
         self.instance_time_window = instance_time_window
-        
     def create_subsampled_datasets(self,
                                 dataset: str,
                                 output_dir: str,
                                 noise_percentages: List[float] = None,
                                 subsampling_factor: float = 1.0,
-                                maintain_constant_size: bool = True):
+                                maintain_constant_size: bool = True,
+                                random_state_mode: str = "fixed",
+                                base_random_state: int = 42):
         """
         Create datasets with different noise percentages
         
@@ -74,6 +75,10 @@ class DirectTrainer:
                             If None, creates full dataset with all available samples
             subsampling_factor: Factor to subsample the original dataset (0.0 to 1.0)
             maintain_constant_size: If True, all datasets will have the same size (LCD)
+            random_state_mode: How to handle random states for each noise percentage
+                            - "fixed": Use the same random state for all percentages
+                            - "pseudorandom": Use base_random_state + noise_percentage for each
+            base_random_state: Base random state value (used differently based on mode)
         """
         
         if dataset == "stead": 
@@ -95,9 +100,17 @@ class DirectTrainer:
         
         print(f"Total samples before subsampling: EQ={len(eq_metadata)}, NO={len(no_metadata)}")
         
+        # Determine random state for initial subsampling
+        # Use a predictable pattern: base_random_state - 1 for subsampling
+        # This ensures it's different from any percentage-based states but still traceable
+        if random_state_mode == "pseudorandom":
+            subsample_random_state = base_random_state - 1
+        else:  # fixed
+            subsample_random_state = base_random_state
+        
         if subsampling_factor < 1.0:
-            eq_metadata = eq_metadata.sample(frac=subsampling_factor, random_state=42)
-            no_metadata = no_metadata.sample(frac=subsampling_factor, random_state=42)
+            eq_metadata = eq_metadata.sample(frac=subsampling_factor, random_state=subsample_random_state)
+            no_metadata = no_metadata.sample(frac=subsampling_factor, random_state=subsample_random_state)
             print(f"After subsampling ({subsampling_factor*100:.0f}%): EQ={len(eq_metadata)}, NO={len(no_metadata)}")
         
         Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -105,7 +118,15 @@ class DirectTrainer:
         if noise_percentages is None or len(noise_percentages) == 0:
             print("No noise percentages specified. Creating full dataset with all available samples...")
             combined_metadata = pd.concat([eq_metadata, no_metadata])
-            combined_metadata = combined_metadata.sample(frac=1, random_state=42).reset_index(drop=True)
+            
+            # Determine random state for full dataset
+            # Use base_random_state - 2 for full dataset to keep it distinct
+            if random_state_mode == "pseudorandom":
+                full_random_state = base_random_state - 2
+            else:  # fixed
+                full_random_state = base_random_state
+                
+            combined_metadata = combined_metadata.sample(frac=1, random_state=full_random_state).reset_index(drop=True)
             combined_metadata = self._assign_crop_offsets(combined_metadata)
             
             output_file = f"FULL_DATASET_SUBSAMPLED_{int(subsampling_factor*100)}.hdf5"
@@ -130,7 +151,17 @@ class DirectTrainer:
             print(f"\nLeast common denominator (constant dataset size): {lcd_size}")
         
         # Create datasets for each noise percentage
-        for noise_pct in noise_percentages:
+        for pct_index, noise_pct in enumerate(noise_percentages):
+            
+            # Determine random state for this specific noise percentage
+            if random_state_mode == "fixed":
+                current_random_state = base_random_state
+            elif random_state_mode == "pseudorandom":
+                current_random_state = base_random_state + int(noise_pct)
+            else:
+                raise ValueError(f"Unknown random_state_mode: {random_state_mode}. "
+                            f"Choose from: 'fixed', 'pseudorandom'")
+            
             if maintain_constant_size:
                 # Use LCD size
                 total_size = min(len(no_metadata), len(eq_metadata))
@@ -163,21 +194,21 @@ class DirectTrainer:
             n_no = min(n_no, len(no_metadata))
             n_eq = min(n_eq, len(eq_metadata))
             
-            # Sample the data
+            # Sample the data with the determined random state
             if n_eq > 0:
-                eq_subset = eq_metadata.sample(n=n_eq, random_state=42)
+                eq_subset = eq_metadata.sample(n=n_eq, random_state=current_random_state)
             else:
                 eq_subset = pd.DataFrame()
                 
             if n_no > 0:
-                no_subset = no_metadata.sample(n=n_no, random_state=42)
+                no_subset = no_metadata.sample(n=n_no, random_state=current_random_state)
             else:
                 no_subset = pd.DataFrame()
             
             # Combine and shuffle
             combined_metadata = pd.concat([eq_subset, no_subset])
             if len(combined_metadata) > 0:
-                combined_metadata = combined_metadata.sample(frac=1, random_state=42).reset_index(drop=True)
+                combined_metadata = combined_metadata.sample(frac=1, random_state=current_random_state).reset_index(drop=True)
                 combined_metadata = self._assign_crop_offsets(combined_metadata)
                 
                 output_file = f"SUBSAMPLED_{int(subsampling_factor*100)}_NOISE_{int(noise_pct)}.hdf5"
@@ -190,9 +221,11 @@ class DirectTrainer:
                 
                 # Calculate actual percentage for verification
                 actual_noise_pct = (n_no / (n_no + n_eq) * 100) if (n_no + n_eq) > 0 else 0
-                print(f"Created dataset with {noise_pct}% noise (actual: {actual_noise_pct:.1f}%): "
+                
+                # Log random state info for debugging
+                rs_info = f"random_state={current_random_state}" if current_random_state is not None else "random_state=None"
+                print(f"Created dataset with {noise_pct}% noise (actual: {actual_noise_pct:.1f}%) [{rs_info}]: "
                     f"EQ={n_eq}, NO={n_no}, Total={n_eq + n_no}")
-      
     def train(self,
               model,
               train_dataset_path: str,

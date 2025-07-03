@@ -19,7 +19,7 @@ trainer = DirectTrainer(dataset='stead',
 trainer.create_subsampled_datasets(
     dataset='stead',
     output_dir=PREPROCESSED_DATASET_DIRECTORY,
-    noise_percentages=[20, 30, 40, 50, 60, 70, 80, 90, 100],
+    noise_percentages=[],
     subsampling_factor=1.0, 
-    maintain_constant_size=True
+    maintain_constant_size=False
 )
