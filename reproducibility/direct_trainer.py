@@ -4,7 +4,7 @@ import h5py
 import tensorflow as tf
 from pathlib import Path
 from typing import Dict, List, Tuple
-
+from sklearn.model_selection import train_test_split
 from data_generator import BatchGenerator
 
 from config import (
@@ -56,6 +56,7 @@ class DirectTrainer:
         self.phase_ensured_crop_ratio = phase_ensured_crop_ratio
         self.stead_time_window = stead_time_window
         self.instance_time_window = instance_time_window
+
     def create_subsampled_datasets(self,
                                 dataset: str,
                                 output_dir: str,
@@ -226,16 +227,61 @@ class DirectTrainer:
                 rs_info = f"random_state={current_random_state}" if current_random_state is not None else "random_state=None"
                 print(f"Created dataset with {noise_pct}% noise (actual: {actual_noise_pct:.1f}%) [{rs_info}]: "
                     f"EQ={n_eq}, NO={n_no}, Total={n_eq + n_no}")
-    def train(self,
-              model,
-              train_dataset_path: str,
-              val_dataset_path: str,
-              epochs: int = 20,
-              batch_size: int = BATCH_SIZE,
-              learning_rate: float = 1e-3):
+
+    def create_train_val_split(self, dataset_path: str, train_val_split=TRAIN_VALIDATION_SPLIT, random_state: int = 42):
+        """
+        Load dataset and split into train/val sets with stratification.
         
-        train_gen = HDF5DataGenerator(train_dataset_path, batch_size, shuffle=True)
-        val_gen = HDF5DataGenerator(val_dataset_path, batch_size, shuffle=False)
+        Args:
+            dataset_path: Path to the HDF5 dataset
+            train_val_split: Fraction for training (default: from config)
+            random_state: Random seed
+        
+        Returns:
+            X_train, X_val, y_train, y_val
+        """
+        with h5py.File(dataset_path, 'r') as f:
+            X = f['X'][:]
+            y = f['y'][:]
+        
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y,
+            train_size=train_val_split,
+            stratify=y,
+            random_state=random_state
+        )
+        
+        print(f"Train: {len(y_train)} samples (EQ: {np.sum(y_train==1)}, NO: {np.sum(y_train==0)})")
+        print(f"Val: {len(y_val)} samples (EQ: {np.sum(y_val==1)}, NO: {np.sum(y_val==0)})")
+        
+        return X_train, X_val, y_train, y_val
+
+    def train(self,
+            model,
+            dataset_path: str = None,
+            train_dataset_path: str = None,
+            val_dataset_path: str = None,
+            epochs: int = 20,
+            batch_size: int = BATCH_SIZE,
+            learning_rate: float = 1e-3,
+            train_val_split: float = TRAIN_VALIDATION_SPLIT,
+            random_state: int = 42):
+        
+        if dataset_path is not None:
+            X_train, X_val, y_train, y_val = self.create_train_val_split(
+                dataset_path=dataset_path,
+                train_val_split=train_val_split,
+                random_state=random_state
+            )
+            
+            train_gen = InMemoryDataGenerator(X_train, y_train, batch_size, shuffle=True)
+            val_gen = InMemoryDataGenerator(X_val, y_val, batch_size, shuffle=False)
+            
+        else:
+            raise ValueError("Must provide either dataset_path OR both train_dataset_path and val_dataset_path")
+        
+        train_x_only = (x for x, _ in train_gen)
+        val_x_only = (x for x, _ in val_gen)
         
         # Compile model
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -243,9 +289,11 @@ class DirectTrainer:
         
         Path("checkpoints").mkdir(exist_ok=True)
         
+        checkpoint_name = Path(dataset_path).stem + "_best_model.h5"
+
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint(
-                'checkpoints/best_model.h5',
+                f'checkpoints/{checkpoint_name}',
                 save_best_only=True,
                 save_weights_only=True,
                 monitor='val_loss',
@@ -267,15 +315,21 @@ class DirectTrainer:
         ]
         
         print("\nStarting training...")
-        print(f"Train samples: {len(train_gen) * batch_size}")
-        print(f"Val samples: {len(val_gen) * batch_size}")
+        if dataset_path is not None:
+            print(f"Train samples: {len(y_train)}")
+            print(f"Val samples: {len(y_val)}")
+        else:
+            print(f"Train samples: {len(train_gen) * batch_size}")
+            print(f"Val samples: {len(val_gen) * batch_size}")
         
         history = model.fit(
-            train_gen,
-            validation_data=val_gen,
+            train_x_only,
+            validation_data=val_x_only,
             epochs=epochs,
             callbacks=callbacks,
-            verbose=1
+            verbose=1,
+            steps_per_epoch=len(train_gen),
+            validation_steps=len(val_gen)
         )
         
         return history
@@ -516,21 +570,13 @@ class DirectTrainer:
         
         print(f"Dataset saved: {output_path}")
 
-
-  
-class HDF5DataGenerator(tf.keras.utils.Sequence):    
-    def __init__(self, hdf5_path: str, batch_size: int, shuffle: bool = True):
-        self.hdf5_path = hdf5_path
+class InMemoryDataGenerator(tf.keras.utils.Sequence):
+    def __init__(self, X, y, batch_size: int, shuffle: bool = True):
+        self.X = X
+        self.y = y
         self.batch_size = batch_size
         self.shuffle = shuffle
-        
-        if not Path(hdf5_path).exists():
-            raise FileNotFoundError(f"Dataset not found: {hdf5_path}")
-        
-        with h5py.File(hdf5_path, 'r') as f:
-            self.n_samples = f['X'].shape[0]
-            print(f"Loaded dataset: {hdf5_path} with {self.n_samples} samples")
-        
+        self.n_samples = len(y)
         self.indices = np.arange(self.n_samples)
         if shuffle:
             np.random.shuffle(self.indices)
@@ -540,23 +586,7 @@ class HDF5DataGenerator(tf.keras.utils.Sequence):
     
     def __getitem__(self, idx):
         batch_indices = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
-        
-        # Sort indices to avoid HDF5 error
-        sorted_indices = np.sort(batch_indices)
-        
-        with h5py.File(self.hdf5_path, 'r') as f:
-            X = f['X'][sorted_indices]
-            y = f['y'][sorted_indices]
-        
-        # If we need to maintain the shuffled order, we need to unsort
-        if self.shuffle:
-            # Get the inverse permutation to restore original order
-            unsort_indices = np.empty_like(sorted_indices)
-            unsort_indices[np.argsort(batch_indices)] = np.arange(len(batch_indices))
-            X = X[unsort_indices]
-            y = y[unsort_indices]
-        
-        return X, y
+        return self.X[batch_indices], self.y[batch_indices]
     
     def on_epoch_end(self):
         if self.shuffle:
