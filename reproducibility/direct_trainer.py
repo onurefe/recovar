@@ -280,8 +280,22 @@ class DirectTrainer:
         else:
             raise ValueError("Must provide either dataset_path OR both train_dataset_path and val_dataset_path")
         
-        train_x_only = (x for x, _ in train_gen)
-        val_x_only = (x for x, _ in val_gen)
+        def train_generator():
+            while True:
+                for i in range(len(train_gen)):
+                    x, _ = train_gen[i]
+                    yield x
+                train_gen.on_epoch_end()
+
+        def val_generator():
+            while True:
+                for i in range(len(val_gen)):
+                    x, _ = val_gen[i]
+                    yield x
+                val_gen.on_epoch_end()
+
+        train_x_only = train_generator()
+        val_x_only = val_generator()
         
         # Compile model
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
