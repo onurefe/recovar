@@ -128,7 +128,7 @@ class DirectTrainer:
             else:  # fixed
                 full_random_state = base_random_state
                 
-            combined_metadata = combined_metadata.sample(frac=1, random_state=full_random_state).reset_index(drop=True)
+            combined_metadata = combined_metadata.reset_index(drop=True)
             combined_metadata = self._assign_crop_offsets(combined_metadata)
             
             output_file = f"FULL_DATASET_SUBSAMPLED_{int(subsampling_factor*100)}"
@@ -202,7 +202,7 @@ class DirectTrainer:
             
             combined_metadata = pd.concat([eq_subset, no_subset])
             if len(combined_metadata) > 0:
-                combined_metadata = combined_metadata.sample(frac=1, random_state=current_random_state).reset_index(drop=True)
+                combined_metadata = combined_metadata.reset_index(drop=True)
                 combined_metadata = self._assign_crop_offsets(combined_metadata)
                 
                 output_file = f"SUBSAMPLED_{int(subsampling_factor*100)}_NOISE_{int(noise_pct)}"
@@ -329,7 +329,7 @@ class DirectTrainer:
                     f.create_dataset('X', data=X_val)
                     f.create_dataset('y', data=y_val)
                 
-                train_gen = HDF5Generator(str(train_path), batch_size, shuffle=True)
+                train_gen = HDF5Generator(str(train_path), batch_size, shuffle=False)
                 val_gen = HDF5Generator(str(val_path), batch_size, shuffle=False)
                 
             else:
@@ -340,13 +340,13 @@ class DirectTrainer:
                     test_ratio=test_ratio,
                     random_state=random_state
                 )
-                
-                train_gen = InMemoryDataGenerator(X_train, y_train, batch_size, shuffle=True)
+
+                train_gen = InMemoryDataGenerator(X_train, y_train, batch_size, shuffle=False)
                 val_gen = InMemoryDataGenerator(X_val, y_val, batch_size, shuffle=False)
         
         elif train_dataset_path is not None and val_dataset_path is not None:
             if use_hdf5_generator:
-                train_gen = HDF5Generator(train_dataset_path, batch_size, shuffle=True)
+                train_gen = HDF5Generator(train_dataset_path, batch_size, shuffle=False)
                 val_gen = HDF5Generator(val_dataset_path, batch_size, shuffle=False)
             else:
                 # Load data into memory
@@ -358,7 +358,7 @@ class DirectTrainer:
                     X_val = f['X'][:]
                     y_val = f['y'][:]
                 
-                train_gen = InMemoryDataGenerator(X_train, y_train, batch_size, shuffle=True)
+                train_gen = InMemoryDataGenerator(X_train, y_train, batch_size, shuffle=False)
                 val_gen = InMemoryDataGenerator(X_val, y_val, batch_size, shuffle=False)
                 
                 print(f"Train samples: {len(y_train)}")
@@ -762,17 +762,14 @@ class HDF5Generator(tf.keras.utils.Sequence):
     """
     Generator that loads batches from HDF5 file unlike loading entire dataset into memory in InMemoryDataGenerator.
     """
-    def __init__(self, hdf5_path: str, batch_size: int, shuffle: bool = True):
+    def __init__(self, hdf5_path: str, batch_size: int, shuffle: bool = False):
         self.hdf5_path = hdf5_path
         self.batch_size = batch_size
-        self.shuffle = shuffle
         
         with h5py.File(hdf5_path, 'r') as f:
             self.n_samples = len(f['y'])
             
         self.indices = np.arange(self.n_samples)
-        if shuffle:
-            np.random.shuffle(self.indices)
     
     def __len__(self):
         return int(np.ceil(self.n_samples / self.batch_size))
@@ -781,32 +778,25 @@ class HDF5Generator(tf.keras.utils.Sequence):
         batch_indices = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
         
         with h5py.File(self.hdf5_path, 'r') as f:
-            sorted_idx = np.sort(batch_indices)
-            sorted_positions = np.argsort(batch_indices)
-            
-            X_batch = f['X'][sorted_idx]
-            y_batch = f['y'][sorted_idx]
-            
-            X_batch = X_batch[sorted_positions]
-            y_batch = y_batch[sorted_positions]
+            X_batch = f['X'][batch_indices]
+            y_batch = f['y'][batch_indices]
             
         return X_batch, y_batch
     
     def on_epoch_end(self):
-        if self.shuffle:
-            np.random.shuffle(self.indices)
+        pass
 
 
 class InMemoryDataGenerator(tf.keras.utils.Sequence):
-    def __init__(self, X, y, batch_size: int, shuffle: bool = True):
+    """
+    In-memory data generator
+    """
+    def __init__(self, X, y, batch_size: int, shuffle: bool = False):
         self.X = X
         self.y = y
         self.batch_size = batch_size
-        self.shuffle = shuffle
         self.n_samples = len(y)
         self.indices = np.arange(self.n_samples)
-        if shuffle:
-            np.random.shuffle(self.indices)
     
     def __len__(self):
         return int(np.ceil(self.n_samples / self.batch_size))
@@ -816,5 +806,5 @@ class InMemoryDataGenerator(tf.keras.utils.Sequence):
         return self.X[batch_indices], self.y[batch_indices]
     
     def on_epoch_end(self):
-        if self.shuffle:
-            np.random.shuffle(self.indices)
+        # REMOVED SHUFFLING - Do nothing
+        pass
