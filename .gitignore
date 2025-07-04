@@ -1,3 +1,6 @@
+#saved data
+/reproducibility/checkpoints
+reproducibility/preprocessed_data
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
