@@ -65,8 +65,8 @@ class DirectTrainer:
                                 random_state_mode: str = "fixed",
                                 base_random_state: int = 42,
                                 save_train_val_test_splits: bool = False,
-                                val_ratio: float = 0.15,
-                                test_ratio: float = 0.15):
+                                val_ratio: float = 0.2,
+                                test_ratio: float = 0.2):
         """
         Create datasets with different noise percentages
         
@@ -398,7 +398,6 @@ class DirectTrainer:
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint(
                 f'checkpoints/{checkpoint_name}',
-                save_best_only=True,
                 save_weights_only=True,
                 monitor='val_loss',
                 verbose=1

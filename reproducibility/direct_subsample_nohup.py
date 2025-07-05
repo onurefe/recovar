@@ -1,26 +1,26 @@
 from direct_trainer import DirectTrainer
 from recovar import RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder
-from directory import (
-    STEAD_WAVEFORMS_HDF5_PATH,
-    STEAD_METADATA_CSV_PATH,
-    INSTANCE_EQ_WAVEFORMS_HDF5_PATH,
-    INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
-    INSTANCE_EQ_METADATA_CSV_PATH,
-    INSTANCE_NOISE_METADATA_CSV_PATH,
-    PREPROCESSED_DATASET_DIRECTORY,
-)
+from config import (STEAD_TIME_WINDOW, INSTANCE_TIME_WINDOW, WINDOW_SIZE)
 
-trainer = DirectTrainer(dataset='stead',
-                       dataset_time_window=60.0,  # STEAD has 60s windows
-                       model_time_window=30.0
-)
+
+DATASET = 'stead'
+MODEL = RepresentationLearningMultipleAutoencoder()
+EPOCH = 10
+
+trainer = DirectTrainer(dataset=DATASET, 
+                            dataset_time_window=STEAD_TIME_WINDOW,
+                             model_time_window=WINDOW_SIZE)
+
 
 trainer.create_subsampled_datasets(
     dataset='stead',
-    output_dir=PREPROCESSED_DATASET_DIRECTORY,
-    noise_percentages=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    subsampling_factor=1.0,
-    maintain_constant_size=True,
-    random_state_mode="pseudorandom",  # Different random state for each noise percentage
-    base_random_state=42       
+    output_dir='preprocessed_data/stead_splits',
+    noise_percentages=[], 
+    subsampling_factor=1, 
+    maintain_constant_size=False,
+    save_train_val_test_splits=True, 
+    val_ratio=0.2, 
+    test_ratio=0.2,
+    random_state_mode='pseudorandom',
+    base_random_state=42
 )
