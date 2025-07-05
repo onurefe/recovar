@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Union
 from sklearn.model_selection import train_test_split
 from data_generator import BatchGenerator
+import tempfile
+import shutil
 
 from config import (
     BATCH_SIZE,
@@ -66,25 +68,23 @@ class DirectTrainer:
                                 base_random_state: int = 42,
                                 save_train_val_test_splits: bool = False,
                                 val_ratio: float = 0.2,
-                                test_ratio: float = 0.2):
+                                test_ratio: float = 0.2,
+                                chunk_size: int = 50000): 
         """
-        Create datasets with different noise percentages
+        Create datasets with different noise percentages using chunked processing to avoid OOM
         
         Args:
             dataset: Dataset name ('stead' or 'instance')
             output_dir: Output directory for preprocessed datasets
             noise_percentages: List of noise percentages (0.0 to 100.0)
-                            Example: [0, 25, 50, 75, 100] for 0%, 25%, 50%, 75%, 100% noise
-                            If None, creates full dataset with all available samples
             subsampling_factor: Factor to subsample the original dataset (0.0 to 1.0)
             maintain_constant_size: If True, all datasets will have the same size (LCD)
             random_state_mode: How to handle random states for each noise percentage
-                            - "fixed": Use the same random state for all percentages
-                            - "pseudorandom": Use base_random_state + noise_percentage for each
-            base_random_state: Base random state value (used differently based on mode)
+            base_random_state: Base random state value
             save_train_val_test_splits: If True, saves separate train/val/test HDF5 files
-            val_ratio: Validation set ratio (default: 0.15)
-            test_ratio: Test set ratio (default: 0.15)
+            val_ratio: Validation set ratio (default: 0.2)
+            test_ratio: Test set ratio (default: 0.2)
+            chunk_size: Number of samples to process at once to avoid OOM (default: 50000)
         """
         
         if dataset == "stead": 
@@ -133,15 +133,15 @@ class DirectTrainer:
             
             output_file = f"FULL_DATASET_SUBSAMPLED_{int(subsampling_factor*100)}"
             if save_train_val_test_splits:
-                self._save_train_val_test_splits(
+                self._save_train_val_test_splits_chunked(  
                     combined_metadata, eq_hdf5_path, no_hdf5_path, 
                     Path(output_dir) / output_file,
-                    val_ratio, test_ratio, full_random_state
+                    val_ratio, test_ratio, full_random_state, chunk_size
                 )
             else:
-                self._save_preprocessed_dataset(
+                self._save_preprocessed_dataset_chunked(  
                     combined_metadata, eq_hdf5_path, no_hdf5_path,
-                    Path(output_dir) / f"{output_file}.hdf5"
+                    Path(output_dir) / f"{output_file}.hdf5", chunk_size
                 )
             
             print(f"Created full dataset: EQ={len(eq_metadata)}, NO={len(no_metadata)}, Total={len(combined_metadata)}")
@@ -208,15 +208,15 @@ class DirectTrainer:
                 output_file = f"SUBSAMPLED_{int(subsampling_factor*100)}_NOISE_{int(noise_pct)}"
                 
                 if save_train_val_test_splits:
-                    self._save_train_val_test_splits(
+                    self._save_train_val_test_splits_chunked( 
                         combined_metadata, eq_hdf5_path, no_hdf5_path,
                         Path(output_dir) / output_file,
-                        val_ratio, test_ratio, current_random_state
+                        val_ratio, test_ratio, current_random_state, chunk_size
                     )
                 else:
-                    self._save_preprocessed_dataset(
+                    self._save_preprocessed_dataset_chunked(
                         combined_metadata, eq_hdf5_path, no_hdf5_path,
-                        Path(output_dir) / f"{output_file}.hdf5"
+                        Path(output_dir) / f"{output_file}.hdf5", chunk_size
                     )
                 
                 actual_noise_pct = (n_no / (n_no + n_eq) * 100) if (n_no + n_eq) > 0 else 0
@@ -224,6 +224,141 @@ class DirectTrainer:
                 rs_info = f"random_state={current_random_state}" if current_random_state is not None else "random_state=None"
                 print(f"Created dataset with {noise_pct}% noise (actual: {actual_noise_pct:.1f}%) [{rs_info}]: "
                     f"EQ={n_eq}, NO={n_no}, Total={n_eq + n_no}")
+
+    def _save_train_val_test_splits_chunked(self, metadata: pd.DataFrame,
+                                           eq_hdf5_path: str,
+                                           no_hdf5_path: str,
+                                           output_base_path: Path,
+                                           val_ratio: float,
+                                           test_ratio: float,
+                                           random_state: int,
+                                           chunk_size: int = 50000):
+        """
+        Process and save dataset as separate train/val/test HDF5 files using chunked processing.
+        """
+        print(f"\nCreating train/val/test splits for: {output_base_path.name}")
+        print(f"Total samples: {len(metadata)} (EQ: {(metadata['label']=='eq').sum()}, "
+              f"NO: {(metadata['label']=='no').sum()})")
+        print(f"Using chunk size: {chunk_size}")
+        
+        #Determine split indices without loading all data
+        labels = (metadata['label'] == 'eq').astype(int).values
+        
+        # Split into train/val/test
+        train_val_ratio = 1.0 - test_ratio
+        train_val_indices, test_indices = train_test_split(
+            np.arange(len(metadata)),
+            train_size=train_val_ratio,
+            stratify=labels,
+            random_state=random_state
+        )
+        
+        val_ratio_adjusted = val_ratio / train_val_ratio
+        train_indices, val_indices = train_test_split(
+            train_val_indices,
+            test_size=val_ratio_adjusted,
+            stratify=labels[train_val_indices],
+            random_state=random_state
+        )
+        
+        splits = {
+            'train': train_indices,
+            'val': val_indices,
+            'test': test_indices
+        }
+        
+        print(f"Split sizes - Train: {len(train_indices)}, Val: {len(val_indices)}, Test: {len(test_indices)}")
+        
+        # Process each split
+        for split_name, split_indices in splits.items():
+            split_metadata = metadata.iloc[split_indices].reset_index(drop=True)
+            output_path = output_base_path.parent / f"{output_base_path.name}_{split_name}.hdf5"
+            
+            print(f"\nProcessing {split_name} split...")
+            self._save_preprocessed_dataset_chunked(
+                split_metadata, eq_hdf5_path, no_hdf5_path, output_path, chunk_size
+            )
+            
+            # Verify the split
+            with h5py.File(output_path, 'r') as f:
+                n_samples = len(f['y'])
+                n_eq = np.sum(f['y'][:] == 1)
+                n_no = np.sum(f['y'][:] == 0)
+                print(f"Saved {split_name}: {output_path} - {n_samples} samples "
+                      f"(EQ: {n_eq}, NO: {n_no})")
+
+    def _save_preprocessed_dataset_chunked(self,
+                                          metadata: pd.DataFrame,
+                                          eq_hdf5_path: str,
+                                          no_hdf5_path: str,
+                                          output_path: Path,
+                                          chunk_size: int = 50000):
+        """
+        Process and save dataset using chunked processing
+        """
+        
+        print(f"\nCreating dataset: {output_path.name}")
+        print(f"Total samples: {len(metadata)} (EQ: {(metadata['label']=='eq').sum()}, "
+              f"NO: {(metadata['label']=='no').sum()})")
+        print(f"Using chunk size: {chunk_size}")
+        
+        # Calculate number of chunks
+        n_chunks = (len(metadata) + chunk_size - 1) // chunk_size
+        print(f"Will process {n_chunks} chunks")
+        
+        # Create output HDF5 file with estimated size
+        timesteps = int(self.model_time_window * self.sampling_freq)
+        
+        with h5py.File(output_path, 'w') as f:
+            # Create datasets with the exact size
+            f.create_dataset('X', (len(metadata), timesteps, 3), dtype='float32')
+            f.create_dataset('y', (len(metadata),), dtype='int32')
+            f.create_dataset('metadata', data=metadata.to_json().encode('utf-8'))
+            
+            sample_idx = 0
+            
+            # Process in chunks
+            for chunk_idx in range(n_chunks):
+                start_idx = chunk_idx * chunk_size
+                end_idx = min(start_idx + chunk_size, len(metadata))
+                chunk_metadata = metadata.iloc[start_idx:end_idx].reset_index(drop=True)
+                
+                print(f"Processing chunk {chunk_idx + 1}/{n_chunks} "
+                      f"(samples {start_idx}:{end_idx}, size: {len(chunk_metadata)})")
+                
+                batch_gen = BatchGenerator(
+                    batch_size=BATCH_SIZE,
+                    batch_metadata=chunk_metadata,
+                    eq_hdf5_path=eq_hdf5_path,
+                    no_hdf5_path=no_hdf5_path,
+                    dataset_time_window=self.dataset_time_window,
+                    model_time_window=self.model_time_window,
+                    sampling_freq=self.sampling_freq,
+                    freqmin=FREQMIN,
+                    freqmax=FREQMAX,
+                    last_axis="channels"
+                )
+                
+                n_batches = batch_gen.num_batches()
+                
+                # Process batches in this chunk
+                for batch_idx in range(n_batches):
+                    X_batch, y_batch = batch_gen.get_batch(batch_idx)
+                    batch_size_actual = X_batch.shape[0]
+                    
+                    # Store in HDF5
+                    f['X'][sample_idx:sample_idx + batch_size_actual] = X_batch
+                    f['y'][sample_idx:sample_idx + batch_size_actual] = y_batch
+                    
+                    sample_idx += batch_size_actual
+                    
+                    if batch_idx % 50 == 0 and batch_idx > 0:
+                        print(f"  Processed {batch_idx}/{n_batches} batches in chunk {chunk_idx + 1}")
+                
+                print(f"Completed chunk {chunk_idx + 1}/{n_chunks}")
+                
+        print(f"Dataset saved: {output_path}")
+        print(f"Total samples processed: {sample_idx}")
 
     def create_train_val_test_split(self, dataset_path: str, 
                                    val_ratio: float = 0.15,
@@ -432,89 +567,8 @@ class DirectTrainer:
         
         return history
 
-    def _save_train_val_test_splits(self, metadata: pd.DataFrame,
-                                    eq_hdf5_path: str,
-                                    no_hdf5_path: str,
-                                    output_base_path: Path,
-                                    val_ratio: float,
-                                    test_ratio: float,
-                                    random_state: int):
-        """
-        Process and save dataset as separate train/val/test HDF5 files.
-        """
-        print(f"\nCreating train/val/test splits for: {output_base_path.name}")
-        print(f"Total samples: {len(metadata)} (EQ: {(metadata['label']=='eq').sum()}, "
-              f"NO: {(metadata['label']=='no').sum()})")
-        
-        batch_gen = BatchGenerator(
-            batch_size=BATCH_SIZE,
-            batch_metadata=metadata,
-            eq_hdf5_path=eq_hdf5_path,
-            no_hdf5_path=no_hdf5_path,
-            dataset_time_window=self.dataset_time_window,
-            model_time_window=self.model_time_window,
-            sampling_freq=self.sampling_freq,
-            freqmin=FREQMIN,
-            freqmax=FREQMAX,
-            last_axis="channels"
-        )
-        
-        n_batches = batch_gen.num_batches()
-        n_samples = n_batches * BATCH_SIZE
-        
-        X_all = np.zeros((n_samples, 3000, 3), dtype='float32')
-        y_all = np.zeros((n_samples,), dtype='int32')
-        
-        sample_idx = 0
-        for batch_idx in range(n_batches):
-            X_batch, y_batch = batch_gen.get_batch(batch_idx)
-            batch_size = X_batch.shape[0]
-            X_all[sample_idx:sample_idx+batch_size] = X_batch
-            y_all[sample_idx:sample_idx+batch_size] = y_batch
-            sample_idx += batch_size
-            
-            if batch_idx % 10 == 0:
-                print(f"Processed {batch_idx+1}/{n_batches} batches...")
-        
-        # Trim to actual size
-        X_all = X_all[:sample_idx]
-        y_all = y_all[:sample_idx]
-        
-        # Split into train/val/test
-        train_val_ratio = 1.0 - test_ratio
-        X_train_val, X_test, y_train_val, y_test = train_test_split(
-            X_all, y_all,
-            train_size=train_val_ratio,
-            stratify=y_all,
-            random_state=random_state
-        )
-        
-        val_ratio_adjusted = val_ratio / train_val_ratio
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_train_val, y_train_val,
-            test_size=val_ratio_adjusted,
-            stratify=y_train_val,
-            random_state=random_state
-        )
-        
-        splits = {
-            'train': (X_train, y_train),
-            'val': (X_val, y_val),
-            'test': (X_test, y_test)
-        }
-        
-        for split_name, (X, y) in splits.items():
-            output_path = output_base_path.parent / f"{output_base_path.name}_{split_name}.hdf5"
-            with h5py.File(output_path, 'w') as f:
-                f.create_dataset('X', data=X)
-                f.create_dataset('y', data=y)
-                
-                if split_name == 'train':
-                    f.create_dataset('metadata', data=metadata.to_json().encode('utf-8'))
-                
-            print(f"Saved {split_name}: {output_path} - {len(y)} samples "
-                  f"(EQ: {np.sum(y==1)}, NO: {np.sum(y==0)})")
-
+    # ... [rest of the methods remain the same - _parse_stead_metadata, _parse_instance_metadata, etc.]
+    
     def _parse_stead_metadata(self, metadata_csv):
         """
         Parses the metadata of the STEAD dataset and transforms certain columns in a
@@ -697,58 +751,6 @@ class DirectTrainer:
     def _get_ts(self, t: float) -> int:
         """Convert time in seconds to number of timesteps"""
         return int(t * self.sampling_freq)
-    
-    def _save_preprocessed_dataset(self,
-                                  metadata: pd.DataFrame,
-                                  eq_hdf5_path: str,
-                                  no_hdf5_path: str,
-                                  output_path: Path):
-        """Process and save dataset using existing BatchGenerator logic"""
-        
-        print(f"\nCreating dataset: {output_path.name}")
-        print(f"Total samples: {len(metadata)} (EQ: {(metadata['label']=='eq').sum()}, "
-              f"NO: {(metadata['label']=='no').sum()})")
-        
-        batch_gen = BatchGenerator(
-            batch_size=BATCH_SIZE,
-            batch_metadata=metadata,
-            eq_hdf5_path=eq_hdf5_path,
-            no_hdf5_path=no_hdf5_path,
-            dataset_time_window=self.dataset_time_window,
-            model_time_window=self.model_time_window,
-            sampling_freq=self.sampling_freq,
-            freqmin=FREQMIN,
-            freqmax=FREQMAX,
-            last_axis="channels"  # or "timesteps" depending on dataset -> change this
-        )
-        
-        n_batches = batch_gen.num_batches()
-        n_samples = n_batches * BATCH_SIZE
-        
-        # Create output HDF5 file
-        with h5py.File(output_path, 'w') as f:
-            f.create_dataset('X', (n_samples, 3000, 3), dtype='float32')
-            f.create_dataset('y', (n_samples,), dtype='int32')
-            
-            # Save metadata as JSON
-            f.create_dataset('metadata', data=metadata.to_json().encode('utf-8'))
-            
-            # Process batches
-            sample_idx = 0
-            for batch_idx in range(n_batches):
-                X_batch, y_batch = batch_gen.get_batch(batch_idx)
-                
-                # Store in HDF5
-                batch_size = X_batch.shape[0]
-                f['X'][sample_idx:sample_idx+batch_size] = X_batch
-                f['y'][sample_idx:sample_idx+batch_size] = y_batch
-                
-                sample_idx += batch_size
-                
-                if batch_idx % 10 == 0:
-                    print(f"Processed {batch_idx+1}/{n_batches} batches...")
-        
-        print(f"Dataset saved: {output_path}")
 
 class HDF5Generator(tf.keras.utils.Sequence):
     """
@@ -798,5 +800,5 @@ class InMemoryDataGenerator(tf.keras.utils.Sequence):
         return self.X[batch_indices], self.y[batch_indices]
     
     def on_epoch_end(self):
-        # REMOVED SHUFFLING - Do nothing
+        # REMOVED SHUFFLING 
         pass
