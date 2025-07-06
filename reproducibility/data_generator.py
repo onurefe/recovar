@@ -156,7 +156,7 @@ class BatchGenerator:
             waveform = {}
             if row["label"] == "eq":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["receiver_code"] #Temporary fix
+                waveform["station_name"] = row["station_name"] #Temporary fix
                 waveform["trace_start_time"] = self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -167,7 +167,7 @@ class BatchGenerator:
 
             if row["label"] == "no":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["receiver_code"] #Temporary fix
+                waveform["station_name"] = row["station_name"] #Temporary fix
                 waveform["trace_start_time"]: self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )

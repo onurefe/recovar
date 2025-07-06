@@ -13,11 +13,11 @@ trainer = DirectTrainer(dataset=DATASET,
 
 
 history = trainer.train(
-    model=model,
-    train_dataset_path='preprocessed_data/stead_splits/FULL_DATASET_SUBSAMPLED_1_train.hdf5',
-    val_dataset_path='preprocessed_data/stead_splits/FULL_DATASET_SUBSAMPLED_1_val.hdf5',
-    test_dataset_path='preprocessed_data/stead_splits/FULL_DATASET_SUBSAMPLED_1_test.hdf5',  # Optional
-    epochs=10,
+    model=MODEL,
+    train_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_train.hdf5',
+    val_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_val.hdf5',
+    test_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_test.hdf5',  # Optional
+    epochs=EPOCH,
     batch_size=256,
     learning_rate=1e-3,
     use_hdf5_generator=True  

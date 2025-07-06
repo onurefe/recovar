@@ -336,7 +336,7 @@ class DirectTrainer:
                     sampling_freq=self.sampling_freq,
                     freqmin=FREQMIN,
                     freqmax=FREQMAX,
-                    last_axis="channels"
+                    last_axis=self._get_last_axis()
                 )
                 
                 n_batches = batch_gen.num_batches()
@@ -537,12 +537,6 @@ class DirectTrainer:
                 monitor='val_loss',
                 verbose=1
             ),
-            tf.keras.callbacks.EarlyStopping(
-                monitor='val_loss',
-                patience=5,
-                restore_best_weights=True,
-                verbose=1
-            ),
         ]
         
         print("\nStarting training...")
@@ -567,8 +561,13 @@ class DirectTrainer:
         
         return history
 
-    # ... [rest of the methods remain the same - _parse_stead_metadata, _parse_instance_metadata, etc.]
-    
+    def _get_last_axis(self):
+        """Determine the last axis based on dataset type"""
+        if self.dataset == "instance":
+            return "timesteps"
+        else:
+            return "channels"
+
     def _parse_stead_metadata(self, metadata_csv):
         """
         Parses the metadata of the STEAD dataset and transforms certain columns in a

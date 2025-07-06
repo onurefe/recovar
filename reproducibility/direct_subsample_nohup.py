@@ -3,17 +3,17 @@ from recovar import RepresentationLearningSingleAutoencoder, RepresentationLearn
 from config import (STEAD_TIME_WINDOW, INSTANCE_TIME_WINDOW, WINDOW_SIZE)
 
 
-DATASET = 'stead'
+DATASET = 'instance'
 trainer = DirectTrainer(dataset=DATASET, 
-                            dataset_time_window=STEAD_TIME_WINDOW,
+                            dataset_time_window=INSTANCE_TIME_WINDOW,
                              model_time_window=WINDOW_SIZE)
 
 
 # Reduced chunk_size for very large datasets
 # 20000 samples ≈ 7.2 GB at processing time, 10000 ≈ 3.6 GB
 trainer.create_subsampled_datasets(
-    dataset='stead',
-    output_dir='preprocessed_data/new_stead',
+    dataset=DATASET,
+    output_dir='preprocessed_data/new_instance',
     noise_percentages=[], 
     subsampling_factor=1, 
     maintain_constant_size=False,
