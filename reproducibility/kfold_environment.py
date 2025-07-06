@@ -386,7 +386,7 @@ class KFoldEnvironment:
         metadata : pandas.DataFrame
             The dataframe that contains standardized metadata of the STEAD dataset.
         """
-        metadata = pd.read_csv(metadata_csv)
+        metadata = pd.read_csv(metadata_csv, low_memory=False)
 
         metadata["source_id"] = metadata["source_id"].astype(str)
         metadata.rename({"receiver_code": "station_name"}, inplace=True)
