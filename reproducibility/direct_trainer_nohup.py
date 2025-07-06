@@ -14,9 +14,9 @@ trainer = DirectTrainer(dataset=DATASET,
 
 history = trainer.train(
     model=MODEL,
-    train_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_train.hdf5',
-    val_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_val.hdf5',
-    test_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_DATASET_SUBSAMPLED_100_test.hdf5',  # Optional
+    train_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_STEAD_SUBSAMPLED_100_train.hdf5',
+    val_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_STEAD_SUBSAMPLED_100_val.hdf5',
+    test_dataset_path='/home/ege/recovar/reproducibility/preprocessed_data/new_stead/FULL_STEAD_SUBSAMPLED_100_test.hdf5',
     epochs=EPOCH,
     batch_size=256,
     learning_rate=1e-3,

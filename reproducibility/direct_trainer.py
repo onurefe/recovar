@@ -526,16 +526,18 @@ class DirectTrainer:
         Path("checkpoints").mkdir(exist_ok=True)
         
         if dataset_path:
-            checkpoint_name = Path(dataset_path).stem + "_best_model.h5"
+            
+            checkpoint_name = Path(dataset_path).stem+f"_epoch_{{epoch:02d}}.h5"
         else:
-            checkpoint_name = Path(train_dataset_path).stem + "_best_model.h5"
-
+            checkpoint_name = Path(train_dataset_path).stem+f"_epoch_{{epoch:02d}}.h5"
+        
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint(
                 f'checkpoints/{checkpoint_name}',
                 save_weights_only=True,
                 monitor='val_loss',
-                verbose=1
+                verbose=1,
+                save_best_only=False
             ),
         ]
         
