@@ -19,11 +19,11 @@ class ContinuousDataPreprocessor:
                  catalog_csv,
                  output_hdf5_path,
                  output_metadata_csv_path,
-                 window_length=30,
+                 window_length=60, #To match STEAD, Kfold will reduce it to 30seconds later.
                  sampling_rate=100,
                  freqmin=1,
-                 freqmax=20,
-                 padding=3):
+                 freqmax=20
+                ):
         """
         Args:
             mseed_dir: Directory containing MSEED files (one per station)
@@ -34,7 +34,6 @@ class ContinuousDataPreprocessor:
             sampling_rate: Target sampling rate (default 100 Hz)
             freqmin: Minimum frequency for bandpass filter
             freqmax: Maximum frequency for bandpass filter
-            padding: Padding in seconds for filtering (default 3)
         """
         self.mseed_dir = mseed_dir
         self.catalog_csv = catalog_csv
@@ -44,8 +43,6 @@ class ContinuousDataPreprocessor:
         self.sampling_rate = sampling_rate
         self.freqmin = freqmin
         self.freqmax = freqmax
-        self.padding = padding
-        self.padded_window_length = window_length + 2 * padding
         
         # Load catalog
         self.catalog = pd.read_csv(catalog_csv)
@@ -131,8 +128,8 @@ class ContinuousDataPreprocessor:
         current_time = start_time
         window_step = self.window_length  # No overlap
         
-        while current_time + self.padded_window_length <= end_time:
-            window_end = current_time + self.padded_window_length
+        while current_time + self.window_length <= end_time:
+            window_end = current_time + self.window_length
             
             # Extract window data
             z_win = z_trace.slice(current_time, window_end).data
@@ -151,7 +148,7 @@ class ContinuousDataPreprocessor:
                 
                 # Check for earthquakes in this window
                 label, p_sample, s_sample = self._check_earthquake_in_window(
-                    station_name, current_time + self.padding, self.window_length
+                    station_name, current_time, self.window_length
                 )
                 
                 # Create trace name
@@ -165,14 +162,13 @@ class ContinuousDataPreprocessor:
                     'trace_name': trace_name,
                     'station_name': station_name,
                     'network': network,
-                    'trace_start_time': (current_time + self.padding).isoformat(),
+                    'trace_start_time': (current_time).isoformat(),
                     'label': label,
-                    'p_arrival': p_sample if p_sample is not None else np.nan,
-                    's_arrival': s_sample if s_sample is not None else np.nan,
+                    'p_arrival_sample': p_sample if p_sample is not None else np.nan,
+                    's_arrival_sample': s_sample if s_sample is not None else np.nan,
                     'source_id': trace_name if label == 'no' else f"eq_{trace_counter}",
                     'trace_category': 'earthquake_local' if label == 'eq' else 'noise',
                     'snr_db': '[0.0 0.0 0.0]',  # Placeholder, can be calculated if needed
-                    'crop_offset': 0  # Will be assigned by KFold framework
                 })
                 
                 trace_counter += 1
@@ -186,7 +182,7 @@ class ContinuousDataPreprocessor:
         if len(z_data) != len(n_data) or len(z_data) != len(e_data):
             return False
             
-        expected_samples = int(self.padded_window_length * self.sampling_rate)
+        expected_samples = int(self.window_length * self.sampling_rate)
         if len(z_data) != expected_samples:
             return False
             
@@ -199,24 +195,18 @@ class ContinuousDataPreprocessor:
         return True
     
     def _preprocess_trace(self, data):
-        """Apply bandpass filter in frequency domain and remove padding. Then demean and normalize"""
-
+        """Apply bandpass filter in frequency domain with demeaning."""
+        
+        # Demean before filtering (helps with edge effects)
+        data = data - np.mean(data)
+        
         f = np.fft.fftfreq(len(data), d=1/self.sampling_rate)
         xw = np.fft.fft(data)
         mask = (np.abs(f) < self.freqmin) | (np.abs(f) > self.freqmax)
         xw[mask] = 0
         filtered = np.real(np.fft.ifft(xw)).astype(np.float32)
-        
-        # Remove padding
-        samples_to_crop = int(self.padding * self.sampling_rate)
-        processed = filtered[samples_to_crop:-samples_to_crop]
-        
-        # Demean and normalize
-        processed -= np.mean(processed)
-        norm = np.sqrt(np.sum(np.square(processed)))
-        processed = processed / (1e-10 + norm)
-        
-        return processed
+
+        return filtered
     
     def _check_earthquake_in_window(self, station_name, window_start, window_length):
         """Check if there's an earthquake in the current window."""
