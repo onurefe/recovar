@@ -4,8 +4,6 @@ from obspy import UTCDateTime
 import h5py
 import pandas as pd
 import os
-from glob import glob
-from tqdm import tqdm
 
 
 class ContinuousDataPreprocessor:
@@ -15,27 +13,24 @@ class ContinuousDataPreprocessor:
     """
     
     def __init__(self, 
-                 mseed_dir,
                  catalog_csv,
                  output_hdf5_path,
                  output_metadata_csv_path,
-                 window_length=60, #To match STEAD, Kfold will reduce it to 30seconds later.
+                 window_length=60,  # To match STEAD, Kfold will reduce it to 30seconds later.
                  sampling_rate=100,
                  freqmin=1,
                  freqmax=20
                 ):
         """
         Args:
-            mseed_dir: Directory containing MSEED files (one per station)
             catalog_csv: CSV file with earthquake catalog (p_time, s_time, station columns)
             output_hdf5_path: Path for output HDF5 file
             output_metadata_csv_path: Path for output metadata CSV
-            window_length: Window length in seconds (default 30)
+            window_length: Window length in seconds (default 60 to match STEAD)
             sampling_rate: Target sampling rate (default 100 Hz)
             freqmin: Minimum frequency for bandpass filter
             freqmax: Maximum frequency for bandpass filter
         """
-        self.mseed_dir = mseed_dir
         self.catalog_csv = catalog_csv
         self.output_hdf5_path = output_hdf5_path
         self.output_metadata_csv_path = output_metadata_csv_path
@@ -51,51 +46,37 @@ class ContinuousDataPreprocessor:
         if 's_arrival_time' in self.catalog.columns:
             self.catalog['s_arrival_time'] = pd.to_datetime(self.catalog['s_arrival_time'])
         
-    def process_all_stations(self):
-        """Process all MSEED files in the directory."""
-        mseed_files = glob(os.path.join(self.mseed_dir, "*.mseed"))
+        self.trace_counter = 0
         
-        all_metadata = []
-        trace_counter = 0
+    def process_station(self, station_dir):
+        """
+        Process all MSEED files in a station directory.
         
-        with h5py.File(self.output_hdf5_path, 'w') as h5f:
-            # Create 'data' group
-            data_group = h5f.create_group('data')
-            
-            for mseed_file in tqdm(mseed_files, desc="Processing stations"):
-                station_metadata, trace_counter = self.process_station(
-                    mseed_file, data_group, trace_counter
-                )
-                all_metadata.extend(station_metadata)
-        
-        # Save metadata
-        metadata_df = pd.DataFrame(all_metadata)
-        metadata_df.to_csv(self.output_metadata_csv_path, index=False)
-        print(f"Processed {len(all_metadata)} windows total")
-        
-    def process_station(self, mseed_file, h5_data_group, trace_counter):
-        """Process a single station's MSEED file."""
+        Args:
+            station_dir: Directory containing MSEED files for one station
+        """
         try:
-            stream = obspy.read(mseed_file)
+            stream = obspy.read(os.path.join(station_dir, "*.mseed"))
         except Exception as e:
-            print(f"Error reading {mseed_file}: {e}")
-            return [], trace_counter
+            print(f"Error reading MSEED files in {station_dir}: {e}")
+            return
+        
+        if len(stream) == 0:
+            return
+        
+        try:
+            stream = stream.merge(fill_value=np.nan)
+        except Exception as e:
+            print(f"Error merging streams: {e}")
+            return
             
-        # Get station name
         station_name = stream[0].stats.station
         network = stream[0].stats.network
         
-        # Merge traces and resample
-        stream = stream.merge(fill_value=np.nan)
-        
-        # Ensure all traces have same sampling rate
         for tr in stream:
             if tr.stats.sampling_rate != self.sampling_rate:
                 tr.resample(self.sampling_rate)
         
-        metadata = []
-        
-        # Get Z, N, E components
         z_trace = stream.select(channel="*Z")
         n_trace = stream.select(channel="*N") 
         e_trace = stream.select(channel="*E")
@@ -108,14 +89,13 @@ class ContinuousDataPreprocessor:
             
         if not (z_trace and n_trace and e_trace):
             print(f"Missing components for station {station_name}")
-            return [], trace_counter
+            return
             
-        # Use first trace of each component
+        # Use first trace of each component -> might need to check this again. May be redundant.
         z_trace = z_trace[0]
         n_trace = n_trace[0]
         e_trace = e_trace[0]
         
-        # Find common time range
         start_time = max(z_trace.stats.starttime, n_trace.stats.starttime, e_trace.stats.starttime)
         end_time = min(z_trace.stats.endtime, n_trace.stats.endtime, e_trace.stats.endtime)
         
@@ -124,58 +104,72 @@ class ContinuousDataPreprocessor:
         n_trace.trim(start_time, end_time)
         e_trace.trim(start_time, end_time)
         
-        # Create windows
+        # Process windows
+        metadata = []
         current_time = start_time
-        window_step = self.window_length  # No overlap
         
-        while current_time + self.window_length <= end_time:
-            window_end = current_time + self.window_length
+        # Open HDF5 file in append mode
+        with h5py.File(self.output_hdf5_path, 'a') as h5f:
+            if 'data' not in h5f:
+                data_group = h5f.create_group('data')
+            else:
+                data_group = h5f['data']
+                
+            while current_time + self.window_length <= end_time:
+                window_end = current_time + self.window_length
+                
+                # Extract window data
+                z_win = z_trace.slice(current_time, window_end).data
+                n_win = n_trace.slice(current_time, window_end).data
+                e_win = e_trace.slice(current_time, window_end).data
+                
+                # Check if window is valid
+                if self._is_window_valid(z_win, n_win, e_win):
+                    # Process traces
+                    z_processed = self._preprocess_trace(z_win)
+                    n_processed = self._preprocess_trace(n_win)
+                    e_processed = self._preprocess_trace(e_win)
+                    
+                    # Stack as (timesteps, channels)
+                    window_data = np.stack([e_processed, n_processed, z_processed], axis=-1)
+                    
+                    # Check for earthquakes
+                    label, p_sample, s_sample = self._check_earthquake_in_window(
+                        station_name, current_time, self.window_length
+                    )
+                    
+                    # Create trace name
+                    trace_name = f"{network}.{station_name}.{current_time.strftime('%Y%m%d_%H%M%S')}"
+                    
+                    # Save to HDF5
+                    data_group.create_dataset(trace_name, data=window_data.astype(np.float32))
+                    
+                    # Add metadata
+                    metadata.append({
+                        'trace_name': trace_name,
+                        'station_name': station_name,
+                        'network': network,
+                        'trace_start_time': current_time.isoformat(),
+                        'label': label,
+                        'p_arrival_sample': p_sample if p_sample is not None else np.nan,
+                        's_arrival_sample': s_sample if s_sample is not None else np.nan,
+                        'source_id': trace_name if label == 'no' else f"eq_{self.trace_counter}",
+                        'trace_category': 'earthquake_local' if label == 'eq' else 'noise',
+                        #'snr_db': '[0.0 0.0 0.0]', #Uncomment if you want to calculate and use SNRFilter
+                    })
+                    
+                    self.trace_counter += 1
+                    
+                current_time += self.window_length
+        
+        if metadata:
+            metadata_df = pd.DataFrame(metadata)
+            if os.path.exists(self.output_metadata_csv_path):
+                metadata_df.to_csv(self.output_metadata_csv_path, mode='a', header=False, index=False)
+            else:
+                metadata_df.to_csv(self.output_metadata_csv_path, index=False)
             
-            # Extract window data
-            z_win = z_trace.slice(current_time, window_end).data
-            n_win = n_trace.slice(current_time, window_end).data
-            e_win = e_trace.slice(current_time, window_end).data
-            
-            # Check if window is valid (no gaps/NaN values)
-            if self._is_window_valid(z_win, n_win, e_win):
-
-                z_processed = self._preprocess_trace(z_win)
-                n_processed = self._preprocess_trace(n_win)
-                e_processed = self._preprocess_trace(e_win)
-                
-                # Stack as (timesteps, channels) - matching STEAD format
-                window_data = np.stack([e_processed, n_processed, z_processed], axis=-1)
-                
-                # Check for earthquakes in this window
-                label, p_sample, s_sample = self._check_earthquake_in_window(
-                    station_name, current_time, self.window_length
-                )
-                
-                # Create trace name
-                trace_name = f"{network}.{station_name}.{current_time.strftime('%Y%m%d_%H%M%S')}"
-                
-                # Save to HDF5
-                h5_data_group.create_dataset(trace_name, data=window_data.astype(np.float32))
-                
-                # Add metadata
-                metadata.append({
-                    'trace_name': trace_name,
-                    'station_name': station_name,
-                    'network': network,
-                    'trace_start_time': (current_time).isoformat(),
-                    'label': label,
-                    'p_arrival_sample': p_sample if p_sample is not None else np.nan,
-                    's_arrival_sample': s_sample if s_sample is not None else np.nan,
-                    'source_id': trace_name if label == 'no' else f"eq_{trace_counter}",
-                    'trace_category': 'earthquake_local' if label == 'eq' else 'noise',
-                    'snr_db': '[0.0 0.0 0.0]',  # Placeholder, can be calculated if needed
-                })
-                
-                trace_counter += 1
-                
-            current_time += window_step
-            
-        return metadata, trace_counter
+            print(f"Processed {len(metadata)} windows from station {station_name}")
     
     def _is_window_valid(self, z_data, n_data, e_data):
         """Check if window data is valid (no NaN or gaps)."""
@@ -197,7 +191,7 @@ class ContinuousDataPreprocessor:
     def _preprocess_trace(self, data):
         """Apply bandpass filter in frequency domain with demeaning."""
         
-        # Demean before filtering (helps with edge effects)
+        # Demean before filtering
         data = data - np.mean(data)
         
         f = np.fft.fftfreq(len(data), d=1/self.sampling_rate)
@@ -232,30 +226,3 @@ class ContinuousDataPreprocessor:
                     return 'eq', p_sample, s_sample
         
         return 'no', None, None
-
-
-def create_continuous_dataset(mseed_dir, catalog_csv, output_dir):
-    """
-    Create continuous dataset files.
-    
-    Args:
-        mseed_dir: Directory containing MSEED files
-        catalog_csv: Path to earthquake catalog CSV
-        output_dir: Directory for output files
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    
-    output_hdf5 = os.path.join(output_dir, "continuous_waveforms.hdf5")
-    output_metadata = os.path.join(output_dir, "continuous_metadata.csv")
-    
-    preprocessor = ContinuousDataPreprocessor(
-        mseed_dir=mseed_dir,
-        catalog_csv=catalog_csv,
-        output_hdf5_path=output_hdf5,
-        output_metadata_csv_path=output_metadata
-    )
-    
-    preprocessor.process_all_stations()
-    
-    return output_hdf5, output_metadata
-
