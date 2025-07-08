@@ -13,7 +13,9 @@
         "INSTANCE_NOISE_WAVEFORMS_HDF5_PATH": "/home/datasets/instance/noise/waveforms.hdf5",
         "INSTANCE_EQ_WAVEFORMS_HDF5_PATH": "/home/datasets/instance/events/waveforms.hdf5",
         "INSTANCE_NOISE_METADATA_CSV_PATH": "/home/datasets/instance/noise/metadata.csv",
-        "INSTANCE_EQ_METADATA_CSV_PATH": "/home/datasets/instance/events/metadata.csv"
+        "INSTANCE_EQ_METADATA_CSV_PATH": "/home/datasets/instance/events/metadata.csv",
+        "CONTINUOUS_WAVEFORMS_HDF5_PATH": "/home/datasets/continuous/continuous_waveforms.hdf5",
+        "CONTINUOUS_METADATA_CSV_PATH": "/home/datasets/continuous/continuous_metadata.csv"
     },
     "PREPROCESSED_DATASET_DIRECTORY": "/home/ege/recovar_data_preprocessed",
     "TRAINED_MODELS_DIR": "/home/ege/recovar_models",
