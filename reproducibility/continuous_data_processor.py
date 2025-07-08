@@ -39,12 +39,13 @@ class ContinuousDataPreprocessor:
         self.freqmin = freqmin
         self.freqmax = freqmax
         
-        # Load catalog
+
+        # Load catalog (Change format to fit your metadata.)
         self.catalog = pd.read_csv(catalog_csv)
         if 'p_arrival_time' in self.catalog.columns:
-            self.catalog['p_arrival_time'] = pd.to_datetime(self.catalog['p_arrival_time'])
+            self.catalog['p_arrival_time'] = pd.to_datetime(self.catalog['p_arrival_time'], format='ISO8601')
         if 's_arrival_time' in self.catalog.columns:
-            self.catalog['s_arrival_time'] = pd.to_datetime(self.catalog['s_arrival_time'])
+            self.catalog['s_arrival_time'] = pd.to_datetime(self.catalog['s_arrival_time'], format='ISO8601')
         
         self.trace_counter = 0
         
