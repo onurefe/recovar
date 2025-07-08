@@ -64,6 +64,8 @@ class ContinuousDataPreprocessor:
         
         if len(stream) == 0:
             return
+        for tr in stream:#Ensure everything is float before merging to prevent errors
+            tr.data = tr.data.astype(np.float32)
         
         try:
             stream = stream.merge(fill_value=np.nan)
