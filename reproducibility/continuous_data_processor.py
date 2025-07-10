@@ -64,6 +64,8 @@ class ContinuousDataPreprocessor:
         
         if len(stream) == 0:
             return
+        for tr in stream:#Ensure everything is float before merging to prevent errors
+            tr.data = tr.data.astype(np.float32)
         
         try:
             stream = stream.merge(fill_value=np.nan)
@@ -118,11 +120,11 @@ class ContinuousDataPreprocessor:
                 
             while current_time + self.window_length <= end_time:
                 window_end = current_time + self.window_length
-                
-                # Extract window data
-                z_win = z_trace.slice(current_time, window_end).data
-                n_win = n_trace.slice(current_time, window_end).data
-                e_win = e_trace.slice(current_time, window_end).data
+
+                expected_samples = int(self.window_length * self.sampling_rate)
+                z_win = z_trace.slice(current_time, window_end).data[:expected_samples]
+                n_win = n_trace.slice(current_time, window_end).data[:expected_samples]
+                e_win = e_trace.slice(current_time, window_end).data[:expected_samples]
                 
                 # Check if window is valid
                 if self._is_window_valid(z_win, n_win, e_win):
@@ -174,21 +176,23 @@ class ContinuousDataPreprocessor:
     
     def _is_window_valid(self, z_data, n_data, e_data):
         """Check if window data is valid (no NaN or gaps)."""
-        if len(z_data) != len(n_data) or len(z_data) != len(e_data):
-            return False
+        for window_data in [z_data, n_data, e_data]:
+            if np.ma.is_masked(window_data):
+                if window_data.mask.any():
+                    return False
+                # If it's masked but has no actual masked values, extract the data
+                window_data = window_data.data
             
-        expected_samples = int(self.window_length * self.sampling_rate)
-        if len(z_data) != expected_samples:
-            return False
+            if np.isnan(window_data).any():
+                return False
             
-        if np.any(np.isnan(z_data)) or np.any(np.isnan(n_data)) or np.any(np.isnan(e_data)):
-            return False
+            if np.all(window_data == 0):
+                return False
             
-        if np.all(z_data == 0) or np.all(n_data == 0) or np.all(e_data == 0):
-            return False
-            
+            if np.isinf(window_data).any():
+                return False
+        
         return True
-    
     def _preprocess_trace(self, data):
         """Apply bandpass filter in frequency domain with demeaning."""
         

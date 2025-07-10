@@ -20,6 +20,8 @@ from directory import (
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
     PREPROCESSED_DATASET_DIRECTORY,
+    CONTINUOUS_METADATA_CSV_PATH,
+    CONTINUOUS_WAVEFORMS_HDF5_PATH
 )
 
 from data_generator import (
@@ -99,6 +101,8 @@ class KFoldEnvironment:
         instance_no_waveforms_hdf5=INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
         instance_eq_metadata_csv=INSTANCE_EQ_METADATA_CSV_PATH,
         instance_no_metadata_csv=INSTANCE_NOISE_METADATA_CSV_PATH,
+        continuous_waveforms_hdf5=CONTINUOUS_WAVEFORMS_HDF5_PATH,
+        continuous_metadata_csv=CONTINUOUS_METADATA_CSV_PATH,
         model_time_window=30.0,
         phase_ensured_crop_ratio=PHASE_PICK_ENSURED_CROP_RATIO,
         phase_ensuring_margin=PHASE_ENSURING_MARGIN,
