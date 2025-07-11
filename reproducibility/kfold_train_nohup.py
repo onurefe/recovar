@@ -3,16 +3,16 @@ from kfold_trainer import KfoldTrainer
 from config import KFOLD_SPLITS
 
 # Experiment name.
-EXP_NAME = "stead_baseline_20"
+EXP_NAME = "continuous_1"
 
 # Should be one of the RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]#, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder]
 
 # Should be stead or instance.
-DATASETS = ["stead"]
+DATASETS = ["continuous"]
 
 # Number of epochs
-NUM_EPOCHS = 20
+NUM_EPOCHS = 1
 
 # For all splits, train the model over defined datasets.
 for train_dataset in DATASETS:

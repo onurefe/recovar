@@ -20,6 +20,8 @@ from directory import (
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
     PREPROCESSED_DATASET_DIRECTORY,
+    CONTINUOUS_METADATA_CSV_PATH,
+    CONTINUOUS_WAVEFORMS_HDF5_PATH
 )
 
 from data_generator import (
@@ -99,6 +101,8 @@ class KFoldEnvironment:
         instance_no_waveforms_hdf5=INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
         instance_eq_metadata_csv=INSTANCE_EQ_METADATA_CSV_PATH,
         instance_no_metadata_csv=INSTANCE_NOISE_METADATA_CSV_PATH,
+        continuous_waveforms_hdf5=CONTINUOUS_WAVEFORMS_HDF5_PATH,
+        continuous_metadata_csv=CONTINUOUS_METADATA_CSV_PATH,
         model_time_window=30.0,
         phase_ensured_crop_ratio=PHASE_PICK_ENSURED_CROP_RATIO,
         phase_ensuring_margin=PHASE_ENSURING_MARGIN,
@@ -143,6 +147,14 @@ class KFoldEnvironment:
             self.no_hdf5_path = instance_no_waveforms_hdf5
             self.last_axis = "timesteps"
             self.dataset_time_window = self.instance_time_window
+
+        if dataset == "continuous":
+            metadata = self._parse_continuous_metadata(continuous_metadata_csv)
+            
+            self.eq_hdf5_path = continuous_waveforms_hdf5
+            self.no_hdf5_path = continuous_waveforms_hdf5  # Same file, like STEAD
+            self.last_axis = "channels"
+            self.dataset_time_window = self.model_time_window  # Should be already windowed to 30s
 
         # This function returns two list of lists. Each list is a chunk list for a split.
         # First list is for training and validation while the second list is for testing.
@@ -447,6 +459,36 @@ class KFoldEnvironment:
 
         standardized_metadata = pd.concat([eq_metadata, no_metadata])
         return standardized_metadata
+
+    def _parse_continuous_metadata(self, metadata_csv):
+            '''
+            Parses the metadata of continuous dataset and transforms columns
+            to enable generic handling.
+            
+            Parameters
+            ----------
+            metadata_csv : str
+                Path to the CSV file containing continuous data metadata
+                
+            Returns
+            -------
+            metadata : pandas.DataFrame
+                Standardized metadata dataframe
+            '''
+            metadata = pd.read_csv(metadata_csv)
+            
+            # Continuous data already has proper column names from preprocessor
+            # Just need to ensure source_id handling
+            eq_metadata = metadata[metadata.label == "eq"].copy()
+            no_metadata = metadata[metadata.label == "no"].copy()
+            
+            # For noise traces, source_id is already set to trace_name
+            # For eq traces, we might want to group by actual earthquake events
+            # but for now, source_id is already handled by preprocessor
+            
+            standardized_metadata = pd.concat([eq_metadata, no_metadata])
+            
+            return standardized_metadata
 
     def _make_chunk_metadata_multiple_of_batch_size(self, chunk_metadata_list):
         """
