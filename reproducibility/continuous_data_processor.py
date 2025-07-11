@@ -4,7 +4,7 @@ from obspy import UTCDateTime
 import h5py
 import pandas as pd
 import os
-
+from obspy.signal.detrend import linear
 
 class ContinuousDataPreprocessor:
     """
@@ -16,7 +16,7 @@ class ContinuousDataPreprocessor:
                  catalog_csv,
                  output_hdf5_path,
                  output_metadata_csv_path,
-                 window_length=60,  # To match STEAD, Kfold will reduce it to 30seconds later.
+                 window_length=60,
                  sampling_rate=100,
                  freqmin=1,
                  freqmax=20
@@ -40,7 +40,7 @@ class ContinuousDataPreprocessor:
         self.freqmax = freqmax
         
 
-        # Load catalog (Change format to fit your metadata.)
+        # Load catalog (IMPORTANT: Change format to fit your metadata.)
         self.catalog = pd.read_csv(catalog_csv)
         if 'p_arrival_time' in self.catalog.columns:
             self.catalog['p_arrival_time'] = pd.to_datetime(self.catalog['p_arrival_time'], format='ISO8601')
@@ -64,7 +64,7 @@ class ContinuousDataPreprocessor:
         
         if len(stream) == 0:
             return
-        for tr in stream:#Ensure everything is float before merging to prevent errors
+        for tr in stream: #Ensure everything is float before merging to prevent errors
             tr.data = tr.data.astype(np.float32)
         
         try:
@@ -107,11 +107,9 @@ class ContinuousDataPreprocessor:
         n_trace.trim(start_time, end_time)
         e_trace.trim(start_time, end_time)
         
-        # Process windows
         metadata = []
         current_time = start_time
         
-        # Open HDF5 file in append mode
         with h5py.File(self.output_hdf5_path, 'a') as h5f:
             if 'data' not in h5f:
                 data_group = h5f.create_group('data')
@@ -126,14 +124,13 @@ class ContinuousDataPreprocessor:
                 n_win = n_trace.slice(current_time, window_end).data[:expected_samples]
                 e_win = e_trace.slice(current_time, window_end).data[:expected_samples]
                 
-                # Check if window is valid
                 if self._is_window_valid(z_win, n_win, e_win):
-                    # Process traces
+                    # Process traces separately 
                     z_processed = self._preprocess_trace(z_win)
                     n_processed = self._preprocess_trace(n_win)
                     e_processed = self._preprocess_trace(e_win)
                     
-                    # Stack as (timesteps, channels)
+                    # Stack as (timesteps, channels) to be compatible with stead
                     window_data = np.stack([e_processed, n_processed, z_processed], axis=-1)
                     
                     # Check for earthquakes
@@ -158,7 +155,6 @@ class ContinuousDataPreprocessor:
                         's_arrival_sample': s_sample if s_sample is not None else np.nan,
                         'source_id': trace_name if label == 'no' else f"eq_{self.trace_counter}",
                         'trace_category': 'earthquake_local' if label == 'eq' else 'noise',
-                        #'snr_db': '[0.0 0.0 0.0]', #Uncomment if you want to calculate and use SNRFilter
                     })
                     
                     self.trace_counter += 1
@@ -196,8 +192,9 @@ class ContinuousDataPreprocessor:
     def _preprocess_trace(self, data):
         """Apply bandpass filter in frequency domain with demeaning."""
         
-        # Demean before filtering
+        # Demean and linear detrend before filtering
         data = data - np.mean(data)
+        data = linear(data)
         
         f = np.fft.fftfreq(len(data), d=1/self.sampling_rate)
         xw = np.fft.fft(data)
@@ -211,7 +208,6 @@ class ContinuousDataPreprocessor:
         """Check if there's an earthquake in the current window."""
         window_end = window_start + window_length
         
-        # Filter catalog for this station
         station_events = self.catalog[self.catalog['station'] == station_name]
         
         for _, event in station_events.iterrows():
