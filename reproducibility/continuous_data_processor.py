@@ -4,7 +4,7 @@ from obspy import UTCDateTime
 import h5py
 import pandas as pd
 import os
-from obspy.signal.detrend import linear
+from obspy.signal import detrend
 
 class ContinuousDataPreprocessor:
     """
@@ -194,7 +194,7 @@ class ContinuousDataPreprocessor:
         
         # Demean and linear detrend before filtering
         data = data - np.mean(data)
-        data = linear(data)
+        data = detrend(data, type='linear')
         
         f = np.fft.fftfreq(len(data), d=1/self.sampling_rate)
         xw = np.fft.fft(data)
