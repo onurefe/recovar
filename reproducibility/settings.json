@@ -8,8 +8,8 @@
         "PHASE_ENSURING_MARGIN":3.0
     },
     "DATASET_DIRECTORIES": {
-        "STEAD_WAVEFORMS_HDF5_PATH": "/home/datasets/stead/waveforms.hdf5",
-        "STEAD_METADATA_CSV_PATH": "/home/datasets/stead/metadata.csv",
+        "STEAD_WAVEFORMS_HDF5_PATH": "/home/boxx/Public/earthquake_model_evaluations/data/Stead/full/waveforms/test.hdf5",
+        "STEAD_METADATA_CSV_PATH": "/home/boxx/Public/earthquake_model_evaluations/data/Stead/full/waveforms/test.csv",
         "INSTANCE_NOISE_WAVEFORMS_HDF5_PATH": "/home/datasets/instance/noise/waveforms.hdf5",
         "INSTANCE_EQ_WAVEFORMS_HDF5_PATH": "/home/datasets/instance/events/waveforms.hdf5",
         "INSTANCE_NOISE_METADATA_CSV_PATH": "/home/datasets/instance/noise/metadata.csv",
@@ -18,6 +18,6 @@
         "CONTINUOUS_METADATA_CSV_PATH": "/home/ege/recovar/reproducibility/output/SLVT_continuous_metadata.csv"
     },
     "PREPROCESSED_DATASET_DIRECTORY": "/home/ege/recovar_data_preprocessed",
-    "TRAINED_MODELS_DIR": "/home/boxx/Public/baseline_models/",
+    "TRAINED_MODELS_DIR": "/home/boxx/Public/baseline_models",
     "RESULTS_DIR": "/home/ege/recovar/reproducibility/results"
 }

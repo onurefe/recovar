@@ -331,7 +331,7 @@ class DataGenerator(Sequence):
         chunk_metadata_list,
         batch_size,
         phase_ensured_crop_ratio,
-        dataset_time_window=120.0,
+        dataset_time_window=120.0, #sorun burada olabilir mi?
         model_time_window=30.0,
         sampling_freq=SAMPLING_FREQ,
         active_chunks=[],

@@ -3,7 +3,7 @@ from kfold_trainer import KfoldTrainer
 from config import KFOLD_SPLITS
 
 # Experiment name.
-EXP_NAME = "continuous_1"
+EXP_NAME = "continuous_20"
 
 # Should be one of the RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]#, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder]
@@ -12,7 +12,7 @@ MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]#, RepresentationLear
 DATASETS = ["continuous"]
 
 # Number of epochs
-NUM_EPOCHS = 1
+NUM_EPOCHS = 20
 
 # For all splits, train the model over defined datasets.
 for train_dataset in DATASETS:

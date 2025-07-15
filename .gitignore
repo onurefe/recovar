@@ -29,6 +29,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 output/
+reproducibility/results
+reproducibility/plots
+reproducibility/models/continuous_1
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
