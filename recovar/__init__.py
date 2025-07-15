@@ -1,7 +1,8 @@
 from .representation_learning_models import (
     RepresentationLearningSingleAutoencoder, 
     RepresentationLearningDenoisingSingleAutoencoder, 
-    RepresentationLearningMultipleAutoencoder
+    RepresentationLearningMultipleAutoencoder,
+    RepresentationLearningMultipleAutoencoderL4
 )
 
 from .classifier_models import (
@@ -36,6 +37,7 @@ __all__ = [
     'RepresentationLearningSingleAutoencoder',
     'RepresentationLearningDenoisingSingleAutoencoder',
     'RepresentationLearningMultipleAutoencoder',
+    'RepresentationLearningMultipleAutoencoderL4'
     
     # Classifier Models
     'ClassifierAutocovariance',
