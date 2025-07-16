@@ -20,4 +20,4 @@ preprocessor = ContinuousDataPreprocessor(
     sampling_rate=100
 )
 
-preprocessor.process_station(station_dirs[5])
+preprocessor.process_station(station_dirs[5])#For SLVT station
