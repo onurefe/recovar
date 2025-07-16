@@ -16,6 +16,8 @@ class KFoldTester:
         test_dataset,
         split,
         epochs,
+        apply_resampling,
+        resample_eq_ratio,
         method_params={},
     ):
         self.exp_name = exp_name
@@ -26,7 +28,9 @@ class KFoldTester:
         self.split = split
         self.epochs = epochs
         self.method_params = method_params
-
+        self.apply_resampling = apply_resampling
+        self.resample_eq_ratio = resample_eq_ratio
+        
         self.representation_learning_model_name = representation_learning_model_class().name
         self.classifier_model_name = classifier_model_class().name
         self._add_test_environment()
@@ -118,7 +122,9 @@ class KFoldTester:
         return classifier_model
 
     def _add_test_environment(self):
-        self.test_environment = KFoldEnvironment(self.test_dataset)
+        self.test_environment = KFoldEnvironment(self.test_dataset,
+                                                 apply_resampling=self.apply_resampling,
+                                                 resample_eq_ratio=self.resample_eq_ratio)
 
     def _get_exp_results_dir(self):
         return get_exp_results_dir(
