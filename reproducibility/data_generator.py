@@ -156,7 +156,7 @@ class BatchGenerator:
             waveform = {}
             if row["label"] == "eq":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["station_name"]
+                waveform["station_name"] = row["station_name"] #Temporary fix
                 waveform["trace_start_time"] = self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -167,7 +167,7 @@ class BatchGenerator:
 
             if row["label"] == "no":
                 waveform["trace_name"] = row["trace_name"]
-                waveform["station_name"] = row["station_name"]
+                waveform["station_name"] = row["station_name"] #Temporary fix
                 waveform["trace_start_time"]: self._utc_datetime_with_nan(
                     row["trace_start_time"]
                 )
@@ -331,7 +331,7 @@ class DataGenerator(Sequence):
         chunk_metadata_list,
         batch_size,
         phase_ensured_crop_ratio,
-        dataset_time_window=120.0,
+        dataset_time_window=120.0, #sorun burada olabilir mi?
         model_time_window=30.0,
         sampling_freq=SAMPLING_FREQ,
         active_chunks=[],
