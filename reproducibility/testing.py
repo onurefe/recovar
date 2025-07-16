@@ -18,7 +18,7 @@ SPLIT = 0
 rows = []
 
 for train_set in ["stead", "instance"]:
-    for test_set in ["stead", "instance"]:
+    for test_set in ["continuous"]:
         for resample_eq_ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
             filters = [CropOffsetFilter()]
             evaluator = Evaluator(exp_name = f"expl4_resample_eq_ratio{resample_eq_ratio}", 
@@ -44,4 +44,4 @@ for train_set in ["stead", "instance"]:
                          "roc_auc": roc_auc})
 
 scores_df = pd.DataFrame(rows)
-scores_df.to_csv("eq_no_ratio_auc_scores.csv")
+scores_df.to_csv("eq_no_ratio_auc_scores_continuous.csv")
