@@ -8,9 +8,12 @@ from config import (
     FREQMIN,
     FREQMAX,
     TRAIN_VALIDATION_SPLIT,
+    TEST_RATIO,
     SUBSAMPLING_FACTOR,
     PHASE_PICK_ENSURED_CROP_RATIO,
     PHASE_ENSURING_MARGIN,
+    APPLY_RESAMPLING,
+    RESAMPLE_EQ_RATIO
 )
 from directory import (
     STEAD_WAVEFORMS_HDF5_PATH,
@@ -111,6 +114,9 @@ class KFoldEnvironment:
         subsampling_factor=SUBSAMPLING_FACTOR,
         sampling_freq=SAMPLING_FREQ,
         train_val_ratio=TRAIN_VALIDATION_SPLIT,
+        test_ratio= TEST_RATIO,
+        apply_resampling=APPLY_RESAMPLING,
+        resample_eq_ratio=RESAMPLE_EQ_RATIO,
         freqmin=FREQMIN,
         freqmax=FREQMAX,
     ):
@@ -125,7 +131,10 @@ class KFoldEnvironment:
         self.train_val_ratio = train_val_ratio
         self.freqmin = freqmin
         self.freqmax = freqmax
+        self.apply_resampling = apply_resampling
+        self.resample_eq_ratio = resample_eq_ratio
         self.n_chunks = n_chunks
+        self.test_ratio = test_ratio
         self._batch_size = batch_size
         self._n_splits = n_splits
         self._dataset = dataset
@@ -171,6 +180,9 @@ class KFoldEnvironment:
         # Split the dataset into chunks.
         chunk_metadata_list = self._split_dataset_to_chunks(metadata, "source_id")
 
+        if self.apply_resampling:
+            chunk_metadata_list = self._resample(chunk_metadata_list)
+            
         # Subsample the chunks.
         chunk_metadata_list = self._subsample_chunk_metadata(chunk_metadata_list)
 
@@ -193,9 +205,20 @@ class KFoldEnvironment:
 
         # Saves the chunk dataframes.
         makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
-        metadata_path = join(
-            self.preprocessed_dataset_directory, self.dataset, "metadata.csv"
-        )
+        if self.apply_resampling:
+            metadata_path = join(
+                self.preprocessed_dataset_directory, 
+                self.dataset, 
+                "resampled_eq{}_subsampled_{}percent.csv".format(int(100 * self.resample_eq_ratio),
+                                                                int(100 * self.subsampling_factor)),
+            )
+        else:
+            metadata_path = join(
+                self.preprocessed_dataset_directory, 
+                self.dataset, 
+                "subsampled_{}percent.csv".format(int(100 * self.subsampling_factor)),
+            )
+            
         if not exists(metadata_path):
             pd.concat(chunk_metadata_list).to_csv(metadata_path)
 
@@ -369,17 +392,29 @@ class KFoldEnvironment:
         :return: Two lists containing lists of chunk indexes. The first list is for training
             and the second list is for testing.
         """
-
-        kfold = KFold(shuffle=True, random_state=random_state, n_splits=self.n_splits)
         chunks = range(self.n_chunks)
-        kfold_gen = kfold.split(chunks)
+        
+        if self._n_splits > 1:
+            kfold = KFold(shuffle=True, random_state=random_state, n_splits=self.n_splits)
+            kfold_gen = kfold.split(chunks)
+            
+            training_chunk_idxs_for_each_split = []
+            testing_chunk_idxs_for_each_split = []
 
-        training_chunk_idxs_for_each_split = []
-        testing_chunk_idxs_for_each_split = []
+            for train_chunk_idxs, test_chunks_idx in kfold_gen:
+                training_chunk_idxs_for_each_split.append(train_chunk_idxs)
+                testing_chunk_idxs_for_each_split.append(test_chunks_idx)
+        else:
+            chunk_list = list(chunks)
+            random.seed(random_state)
+            random.shuffle(chunk_list)
 
-        for train_chunk_idxs, test_chunks_idx in kfold_gen:
-            training_chunk_idxs_for_each_split.append(train_chunk_idxs)
-            testing_chunk_idxs_for_each_split.append(test_chunks_idx)
+            num_training_chunks = int(len(chunk_list) * (1. - self.test_ratio))
+            training_chunks = chunk_list[0:num_training_chunks]
+            testing_chunks = chunk_list[num_training_chunks:]
+            
+            training_chunk_idxs_for_each_split = [training_chunks]
+            testing_chunk_idxs_for_each_split = [testing_chunks]
 
         return training_chunk_idxs_for_each_split, testing_chunk_idxs_for_each_split
 
@@ -398,10 +433,11 @@ class KFoldEnvironment:
         metadata : pandas.DataFrame
             The dataframe that contains standardized metadata of the STEAD dataset.
         """
-        metadata = pd.read_csv(metadata_csv, low_memory=False)
+        metadata = pd.read_csv(metadata_csv)
 
         metadata["source_id"] = metadata["source_id"].astype(str)
-        metadata.rename({"receiver_code": "station_name"}, inplace=True)
+        metadata.rename({"receiver_code": "station_name"}, axis=1, inplace=True)
+
         eq_metadata = metadata[metadata.trace_category == "earthquake_local"].copy()
         no_metadata = metadata[metadata.trace_category == "noise"].copy()
 
@@ -537,11 +573,18 @@ class KFoldEnvironment:
         makedirs(processed_hdf5_dir, exist_ok=True)
 
         # Creates the path of the preprocessed dataset.
-        processed_hdf5_path = join(
-            processed_hdf5_dir,
-            "subsampled_{}percent.hdf5".format(int(100 * self.subsampling_factor)),
-        )
-
+        if self.apply_resampling:
+            processed_hdf5_path = join(
+                processed_hdf5_dir,
+                "resampled_eq{}_subsampled_{}percent.hdf5".format(int(100 * self.resample_eq_ratio),
+                                                                  int(100 * self.subsampling_factor)),
+            )
+        else:
+            processed_hdf5_path = join(
+                processed_hdf5_dir,
+                "subsampled_{}percent.hdf5".format(int(100 * self.subsampling_factor)),
+            )
+        
         # Creates preprocessed dataset if not exists. Otherwise, loads it.
         datagen = DataGenerator(
             processed_hdf5_path=processed_hdf5_path,
@@ -613,6 +656,40 @@ class KFoldEnvironment:
 
         return subsampled_chunk_metadata_list
 
+    def _resample(self, chunk_metadata_list):
+        """
+        Resamples the chunk dataframes.
+
+        Parameters
+        ----------
+        chunk_metadata_list : list
+            A list of chunk dataframes.
+
+        Returns
+        -------
+        list
+            A list of resampled chunk dataframes.
+        """
+        resampled_chunk_metadata_list = []
+
+        for chunk_metadata in chunk_metadata_list:
+            eq_chunk_metadata = chunk_metadata[chunk_metadata.label == "eq"]
+            no_chunk_metadata = chunk_metadata[chunk_metadata.label == "no"]
+            
+            num_samples = min(len(eq_chunk_metadata), len(no_chunk_metadata))
+            
+            no_ratio = 1. - self.resample_eq_ratio
+            num_nos = int(no_ratio * num_samples)
+            num_eqs = int(self.resample_eq_ratio * num_samples) 
+            
+            eq_chunk_metadata = eq_chunk_metadata.sample(n=num_eqs, random_state=0)
+            no_chunk_metadata = no_chunk_metadata.sample(n=num_nos, random_state=0)
+            
+            resampled_metadata = pd.concat([eq_chunk_metadata, no_chunk_metadata], axis=0)
+            resampled_chunk_metadata_list.append(resampled_metadata)
+
+        return resampled_chunk_metadata_list
+    
     def _assign_chunk_idx(self, metadata, chunk_idx):
         """
         Args:

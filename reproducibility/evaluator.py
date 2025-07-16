@@ -133,9 +133,12 @@ class Evaluator:
         train_dataset,
         test_dataset,
         filters,
-        epochs,
         split,
-        method_params
+        method_params,
+        epochs=None,
+        report_best_val_score_epoch=False,
+        apply_resampling=False,
+        resample_eq_ratio=0.5
     ):
         self.exp_name = exp_name
         self.train_dataset = train_dataset
@@ -143,10 +146,16 @@ class Evaluator:
         self.filters = filters
         self.epochs = epochs
         self.split = split
+        self.apply_resampling = apply_resampling
+        self.resample_eq_ratio = resample_eq_ratio
         self.method_params = method_params
+        self.report_best_val_score_epoch = report_best_val_score_epoch
         self.representation_learning_model_name = representation_learning_model_class().name
         self.classifier_model_name = classifier_model_class().name
 
+        if self.report_best_val_score_epoch:
+            self.epochs = [self._get_best_val_score_epoch()]
+            
         self._add_tester(
             representation_learning_model_class=representation_learning_model_class,
             classifier_model_class=classifier_model_class,
@@ -163,6 +172,7 @@ class Evaluator:
         indexer = np.array(df_meta.index)
 
         roc_vectors = []
+
         for epoch in self.epochs:
             df_score = self._read_score_file(epoch)
             df_score = df_score.iloc[indexer]
@@ -189,11 +199,19 @@ class Evaluator:
         _metadata = _metadata.sample(frac=1)
         return _metadata
 
+    def _read_history_file(self):
+        return pd.read_csv(self._get_)
     def _read_meta_file(self):
         return pd.read_csv(self._get_meta_file_path())
 
     def _read_score_file(self, epoch):
         return pd.read_csv(self._get_score_file_path(epoch))
+
+    def _get_best_val_score_epoch(self):
+        history_csv_path = self._get_history_file_path()
+        df = pd.read_csv(history_csv_path)
+        epoch = df["val_loss"].idxmin()
+        return epoch
 
     def _add_tester(self, representation_learning_model_class, classifier_model_class):
         self.tester = KFoldTester(
@@ -205,6 +223,8 @@ class Evaluator:
             split=self.split,
             epochs=self.epochs,
             method_params=self.method_params,
+            apply_resampling=self.apply_resampling,
+            resample_eq_ratio=self.resample_eq_ratio
         )
 
     def _are_results_present(self):
@@ -220,7 +240,15 @@ class Evaluator:
 
     def _is_meta_file_present(self):
         return exists(self._get_meta_file_path())
-
+    
+    def _get_history_file_path(self):
+        history_file_path = get_history_csv_path(exp_name=self.exp_name,
+                                                 representation_learning_model_name=self.representation_learning_model_name,
+                                                 train_dataset=self.train_dataset,
+                                                 split=self.split)
+        
+        return history_file_path
+        
     def _get_score_file_path(self, epoch):
         score_file_path = get_exp_results_score_file_path(
             self.exp_name,

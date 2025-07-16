@@ -1,11 +1,14 @@
 { 
     "CONFIG": {
-        "SUBSAMPLING_FACTOR":1.0,
-        "TRAIN_VALIDATION_SPLIT": 0.80,
-        "KFOLD_SPLITS": 5,
+        "SUBSAMPLING_FACTOR": 1.0,
+        "TRAIN_VALIDATION_SPLIT": 0.75,
+        "KFOLD_SPLITS": 1,
         "DATASET_CHUNKS": 20,
         "PHASE_PICK_ENSURED_CROP_RATIO": 0.6666666,
-        "PHASE_ENSURING_MARGIN":3.0
+        "PHASE_ENSURING_MARGIN":3.0,
+        "APPLY_RESAMPLING":true,
+        "RESAMPLE_EQ_RATIO":0.5,
+        "SINGLE_SPLIT_TEST_RATIO":0.2
     },
     "DATASET_DIRECTORIES": {
         "STEAD_WAVEFORMS_HDF5_PATH": "/home/boxx/Public/earthquake_model_evaluations/data/Stead/full/waveforms/test.hdf5",
