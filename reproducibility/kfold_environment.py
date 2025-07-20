@@ -22,6 +22,8 @@ from directory import (
     INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
+    CUSTOM_WAVEFORMS_HDF5_PATH,
+    CUSTOM_METADATA_CSV_PATH,
     PREPROCESSED_DATASET_DIRECTORY,
 )
 
@@ -98,6 +100,8 @@ class KFoldEnvironment:
         instance_time_window=INSTANCE_TIME_WINDOW,
         stead_waveforms_hdf5=STEAD_WAVEFORMS_HDF5_PATH,
         stead_metadata_csv=STEAD_METADATA_CSV_PATH,
+        custom_waveforms_hdf5 = CUSTOM_WAVEFORMS_HDF5_PATH,
+        custom_metadata_csv=CUSTOM_METADATA_CSV_PATH,
         instance_eq_waveforms_hdf5=INSTANCE_EQ_WAVEFORMS_HDF5_PATH,
         instance_no_waveforms_hdf5=INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
         instance_eq_metadata_csv=INSTANCE_EQ_METADATA_CSV_PATH,
@@ -143,6 +147,14 @@ class KFoldEnvironment:
             self.last_axis = "channels"
             self.dataset_time_window = self.stead_time_window
 
+        if dataset == "custom":
+            metadata = self._parse_stead_metadata(custom_metadata_csv)
+            
+            self.eq_hdf5_path = custom_waveforms_hdf5
+            self.no_hdf5_path = custom_waveforms_hdf5
+            self.last_axis = "channels"
+            self.dataset_time_window = self.stead_time_window
+            
         if dataset == "instance":
             metadata = self._parse_instance_metadata(
                 instance_eq_metadata_csv, instance_no_metadata_csv
@@ -334,9 +346,12 @@ class KFoldEnvironment:
         metadata_list = []
         for chunk in chunks:
             metadata_list.append(self.chunk_metadata_list[chunk])
-
-        return pd.concat(metadata_list)
-
+        
+        if len(metadata_list) > 0:
+            return pd.concat(metadata_list)
+        else:
+            return pd.DataFrame()
+        
     def _split_dataset_to_chunks(self, dataset_metadata, colname, random_state=0):
         """
         Splits the dataset metadata into chunks based on the unique values of the column named colname.

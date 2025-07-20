@@ -53,9 +53,11 @@ class KFoldTester:
 
     def _predict(self, classifier_model, predict_gen):
         outputs = []
-        for i in range(predict_gen.__len__()):
+        n_batches = predict_gen.__len__()
+        for i in range(n_batches):
             x = predict_gen.__getitem__(i)
             y = classifier_model(x)
+            print(f"Prediction completed:{i}/{n_batches}")
             outputs.append(y)
         
         output = np.concatenate(outputs, axis=0)
