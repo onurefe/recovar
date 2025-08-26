@@ -9,17 +9,17 @@ from config import KFOLD_SPLITS
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]
 
 # Should be stead or instance.
-DATASETS = ["stead", "instance"]
+DATASETS = ["instance"]
 
 # Number of epochs
-NUM_EPOCHS = 100
+NUM_EPOCHS = 40
 
 # For all splits, train the model over defined datasets.
-for eq_ratio in [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+for eq_ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
     for train_dataset in DATASETS:
         for model_class in MODEL_CLASSES:
-            for split in range(KFOLD_SPLITS):
-                exp_name = f"exp_resample_eq_ratio{eq_ratio}"
+            for split in range(1):
+                exp_name = f"exp_custom_resample_eq_ratio{eq_ratio}"
                 kfold_trainer = KfoldTrainer(
                     exp_name, 
                     model_class, 
