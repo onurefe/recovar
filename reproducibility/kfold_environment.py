@@ -116,6 +116,7 @@ class KFoldEnvironment:
         train_val_ratio=TRAIN_VALIDATION_SPLIT,
         test_ratio= TEST_RATIO,
         apply_resampling=APPLY_RESAMPLING,
+        resample_while_keeping_total_waveforms_fixed=False,
         resample_eq_ratio=RESAMPLE_EQ_RATIO,
         freqmin=FREQMIN,
         freqmax=FREQMAX,
@@ -131,6 +132,7 @@ class KFoldEnvironment:
         self.train_val_ratio = train_val_ratio
         self.freqmin = freqmin
         self.freqmax = freqmax
+        self.resample_while_keeping_total_waveforms_fixed = resample_while_keeping_total_waveforms_fixed
         self.apply_resampling = apply_resampling
         self.resample_eq_ratio = resample_eq_ratio
         self.n_chunks = n_chunks
@@ -649,14 +651,25 @@ class KFoldEnvironment:
             eq_chunk_metadata = chunk_metadata[chunk_metadata.label == "eq"]
             no_chunk_metadata = chunk_metadata[chunk_metadata.label == "no"]
             
-            num_samples = min(len(eq_chunk_metadata), len(no_chunk_metadata))
+            num_eqs = len(eq_chunk_metadata)
+            num_nos = len(no_chunk_metadata)
             
-            no_ratio = 1. - self.resample_eq_ratio
-            num_nos = int(no_ratio * num_samples)
-            num_eqs = int(self.resample_eq_ratio * num_samples) 
+            if self.resample_while_keeping_total_waveforms_fixed:
+                dest_num_waveforms = min(num_eqs, num_nos)
+                dest_num_eqs = int(dest_num_waveforms * self.resample_eq_ratio)
+                dest_num_nos = int(dest_num_waveforms * (1. - self.resample_eq_ratio))
+            else:
+                eq_to_noise_ratio = self.resample_eq_ratio / (1. - self.resample_eq_ratio)
+                dest_num_nos =int(num_eqs / eq_to_noise_ratio)
             
-            eq_chunk_metadata = eq_chunk_metadata.sample(n=num_eqs, random_state=0)
-            no_chunk_metadata = no_chunk_metadata.sample(n=num_nos, random_state=0)
+                if dest_num_nos <= num_nos:
+                    dest_num_eqs = num_eqs
+                else:
+                    dest_num_nos = num_nos
+                    dest_num_eqs = int(num_nos * eq_to_noise_ratio) 
+                            
+            eq_chunk_metadata = eq_chunk_metadata.sample(n=dest_num_eqs, random_state=0)
+            no_chunk_metadata = no_chunk_metadata.sample(n=dest_num_nos, random_state=0)
             
             resampled_metadata = pd.concat([eq_chunk_metadata, no_chunk_metadata], axis=0)
             resampled_chunk_metadata_list.append(resampled_metadata)

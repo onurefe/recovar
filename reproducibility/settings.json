@@ -1,14 +1,14 @@
 { 
     "CONFIG": {
         "SUBSAMPLING_FACTOR": 1.0,
-        "TRAIN_VALIDATION_SPLIT": 1.0,
-        "KFOLD_SPLITS": 1,
-        "DATASET_CHUNKS": 20,
+        "TRAIN_VALIDATION_SPLIT": 0.8,
+        "KFOLD_SPLITS": 5,
+        "DATASET_CHUNKS": 5,
         "PHASE_PICK_ENSURED_CROP_RATIO": 1.0,
         "PHASE_ENSURING_MARGIN":6.0,
-        "APPLY_RESAMPLING":false,
-        "RESAMPLE_EQ_RATIO":0.5,
-        "SINGLE_SPLIT_TEST_RATIO":1.0
+        "APPLY_RESAMPLING":true,
+        "RESAMPLE_EQ_RATIO":0.1,
+        "SINGLE_SPLIT_TEST_RATIO":0.2
     },
     "DATASET_DIRECTORIES": {
         "STEAD_WAVEFORMS_HDF5_PATH": "/home/datasets/stead/waveforms.hdf5",
@@ -17,8 +17,8 @@
         "INSTANCE_EQ_WAVEFORMS_HDF5_PATH": "/home/datasets/instance/events/waveforms.hdf5",
         "INSTANCE_NOISE_METADATA_CSV_PATH": "/home/datasets/instance/noise/metadata.csv",
         "INSTANCE_EQ_METADATA_CSV_PATH": "/home/datasets/instance/events/metadata.csv",
-        "CUSTOM_WAVEFORMS_HDF5_PATH": "/home/datasets/silivri/waveforms_overlap.hdf5",
-        "CUSTOM_METADATA_CSV_PATH": "/home/datasets/silivri/metadata_overlap.csv"
+        "CUSTOM_WAVEFORMS_HDF5_PATH": "/mnt/data_a/ege/SLVT/SLVT_continuous_waveforms_overlap.hdf5",
+        "CUSTOM_METADATA_CSV_PATH": "/mnt/data_a/ege/SLVT/SLVT_continuous_metadata_overlap.csv"
     },
     "PREPROCESSED_DATASET_DIRECTORY": "/home/onur/recovar_data_preprocessed",
     "TRAINED_MODELS_DIR": "/home/boxx/Public/baseline_models",

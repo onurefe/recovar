@@ -6,6 +6,8 @@ from kfold_tester import KFoldTester
 from evaluator import Evaluator, CropOffsetFilter, LastEarthquakeFilter
 from sklearn.metrics import auc
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Should be RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder or RepresentationLearningMultipleAutoencoder
 REPRESENTATION_LEARNING_MODEL_CLASS = RepresentationLearningMultipleAutoencoder
@@ -42,44 +44,44 @@ def _eval_resamplings(experiment_prefix, df_path):
                              "roc_auc": roc_auc})
 
     scores_df = pd.DataFrame(rows)
-    scores_df.to_csv(df_path)    
+    scores_df.to_csv(df_path)
+    
+def _plot_roc(experiment_prefix, resample_eq_ratio):
+    filters = [CropOffsetFilter(), LastEarthquakeFilter()]
+    evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
+                          representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
+                          classifier_model_class = CLASSIFIER_MODEL_CLASS, 
+                          train_dataset = "custom", 
+                          test_dataset = "custom", 
+                          filters = filters, 
+                          split = 0,
+                          apply_resampling=True,
+                          resample_eq_ratio=resample_eq_ratio,
+                          report_best_val_score_epoch=True,
+                          method_params={})
 
-filters = [CropOffsetFilter(), LastEarthquakeFilter()]
-evaluator = Evaluator(exp_name = f"exp_test", 
-                      representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
-                      classifier_model_class = CLASSIFIER_MODEL_CLASS, 
-                      train_dataset = "stead", 
-                      test_dataset = "custom", 
-                      filters = filters, 
-                      split = 0,
-                      apply_resampling=False,
-                      resample_eq_ratio=None,
-                      report_best_val_score_epoch=True,
-                      method_params={})
+    roc_vectors = evaluator.get_roc_vectors()
+    roc_auc = auc(roc_vectors[0]["fpr"], roc_vectors[0]["tpr"])
+    print(roc_auc)
 
-roc_vectors = evaluator.get_roc_vectors()
-roc_auc = auc(roc_vectors[0]["fpr"], roc_vectors[0]["tpr"])
-print(roc_auc)
+    # Create a DataFrame for Seaborn
+    roc_data = pd.DataFrame({
+        'False Positive Rate': roc_vectors[0]["fpr"],
+        'True Positive Rate': roc_vectors[0]["tpr"]
+    })
 
-import seaborn as sns
-import pandas as pd
-import matplotlib.pyplot as plt
+    plt.figure(figsize=(8, 6))
+    sns.lineplot(data=roc_data, x='False Positive Rate', y='True Positive Rate', label='ROC Curve')
 
-# Create a DataFrame for Seaborn
-roc_data = pd.DataFrame({
-    'False Positive Rate': roc_vectors[0]["fpr"],
-    'True Positive Rate': roc_vectors[0]["tpr"]
-})
+    # Plot random guess line
+    plt.plot([0, 1], [0, 1], 'k--', label='Random Guess')
 
-plt.figure(figsize=(8, 6))
-sns.lineplot(data=roc_data, x='False Positive Rate', y='True Positive Rate', label='ROC Curve')
-
-# Plot random guess line
-plt.plot([0, 1], [0, 1], 'k--', label='Random Guess')
-
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC Curve for Seismic Detection Model')
-plt.legend()
-plt.grid(True)
-plt.savefig("tpr-fpr.png")
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve for Seismic Detection Model')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("tpr-fpr.png")
+    
+_plot_roc("exp_resample_eq_ratio", 0.1)
+# _eval_resamplings("exp_test", "/home/onur/Code/recovar/resampling_vs_score.csv")
