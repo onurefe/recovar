@@ -15,11 +15,11 @@ DATASETS = ["instance"]
 NUM_EPOCHS = 40
 
 # For all splits, train the model over defined datasets.
-for eq_ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+for eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
     for train_dataset in DATASETS:
         for model_class in MODEL_CLASSES:
             for split in range(1):
-                exp_name = f"exp_custom_resample_eq_ratio{eq_ratio}"
+                exp_name = f"exp_instance_resample_eq_ratio{eq_ratio}"
                 kfold_trainer = KfoldTrainer(
                     exp_name, 
                     model_class, 

@@ -3,7 +3,7 @@
         "SUBSAMPLING_FACTOR": 1.0,
         "TRAIN_VALIDATION_SPLIT": 0.75,
         "KFOLD_SPLITS": 5,
-        "DATASET_CHUNKS": 5,
+        "DATASET_CHUNKS": 20,
         "PHASE_PICK_ENSURED_CROP_RATIO": 1.0,
         "PHASE_ENSURING_MARGIN":6.0,
         "APPLY_RESAMPLING":true,

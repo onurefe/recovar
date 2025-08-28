@@ -19,10 +19,14 @@ SPLIT = 0
 rows = []
 
 def _eval_resamplings(experiment_prefix, df_path):
-    for train_set in ["stead", "instance"]:
-        for test_set in ["stead", "instance"]:
-            for resample_eq_ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
-                filters = [CropOffsetFilter(), LastEarthquakeFilter()]
+    for train_set in ["instance"]:
+        for test_set in ["instance"]:
+            for resample_eq_ratio in [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+                if test_set == "custom": 
+                    filters = [CropOffsetFilter(), LastEarthquakeFilter()]
+                else:
+                    filters = [CropOffsetFilter()]
+                    
                 evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
                                       representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
                                       classifier_model_class = CLASSIFIER_MODEL_CLASS, 
@@ -32,6 +36,7 @@ def _eval_resamplings(experiment_prefix, df_path):
                                       split = SPLIT,
                                       apply_resampling=True,
                                       resample_eq_ratio=resample_eq_ratio,
+                                      resample_while_keeping_total_waveforms_fixed=True,
                                       report_best_val_score_epoch=True,
                                       method_params={})
 
@@ -83,5 +88,5 @@ def _plot_roc(experiment_prefix, resample_eq_ratio):
     plt.grid(True)
     plt.savefig("tpr-fpr.png")
     
-_plot_roc("exp_resample_eq_ratio", 0.1)
-# _eval_resamplings("exp_test", "/home/onur/Code/recovar/resampling_vs_score.csv")
+#_plot_roc("exp_resample_eq_ratio", 0.1)
+_eval_resamplings("exp_instance_resample_eq_ratio", "/home/onur/Code/recovar/resampling_vs_score.csv")

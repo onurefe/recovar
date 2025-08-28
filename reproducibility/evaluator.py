@@ -207,6 +207,7 @@ class Evaluator:
         epochs=None,
         report_best_val_score_epoch=False,
         apply_resampling=False,
+        resample_while_keeping_total_waveforms_fixed=False,
         resample_eq_ratio=0.5
     ):
         self.exp_name = exp_name
@@ -218,6 +219,7 @@ class Evaluator:
         self.apply_resampling = apply_resampling
         self.resample_eq_ratio = resample_eq_ratio
         self.method_params = method_params
+        self.resample_while_keeping_total_waveforms_fixed=resample_while_keeping_total_waveforms_fixed
         self.report_best_val_score_epoch = report_best_val_score_epoch
         self.representation_learning_model_name = representation_learning_model_class().name
         self.classifier_model_name = classifier_model_class().name
@@ -291,6 +293,7 @@ class Evaluator:
             test_dataset=self.test_dataset,
             split=self.split,
             epochs=self.epochs,
+            resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed,
             method_params=self.method_params,
             apply_resampling=self.apply_resampling,
             resample_eq_ratio=self.resample_eq_ratio
