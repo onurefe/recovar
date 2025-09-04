@@ -89,4 +89,4 @@ def _plot_roc(experiment_prefix, resample_eq_ratio):
     plt.savefig("tpr-fpr.png")
     
 #_plot_roc("exp_resample_eq_ratio", 0.1)
-_eval_resamplings("exp_instance_resample_eq_ratio", "/home/onur/Code/recovar/resampling_vs_score.csv")
+_eval_resamplings("exp_instance_resample_eq_ratio", "/home/onur/Code/recovar/resampling_vs_score.csv")  
