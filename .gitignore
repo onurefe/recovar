@@ -1,13 +1,11 @@
-#saved data
-/reproducibility/checkpoints
-reproducibility/preprocessed_data
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.csv
 # C extensions
 *.so
+*.gitignore
 
 # Distribution / packaging
 .Python
@@ -19,6 +17,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+checkpoints
 parts/
 sdist/
 var/
@@ -28,10 +27,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-output/
-reproducibility/results
-reproducibility/plots
-reproducibility/models/continuous_1
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

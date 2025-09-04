@@ -22,9 +22,9 @@ from directory import (
     INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
+    CUSTOM_WAVEFORMS_HDF5_PATH,
+    CUSTOM_METADATA_CSV_PATH,
     PREPROCESSED_DATASET_DIRECTORY,
-    CONTINUOUS_METADATA_CSV_PATH,
-    CONTINUOUS_WAVEFORMS_HDF5_PATH
 )
 
 from data_generator import (
@@ -100,12 +100,12 @@ class KFoldEnvironment:
         instance_time_window=INSTANCE_TIME_WINDOW,
         stead_waveforms_hdf5=STEAD_WAVEFORMS_HDF5_PATH,
         stead_metadata_csv=STEAD_METADATA_CSV_PATH,
+        custom_waveforms_hdf5 = CUSTOM_WAVEFORMS_HDF5_PATH,
+        custom_metadata_csv=CUSTOM_METADATA_CSV_PATH,
         instance_eq_waveforms_hdf5=INSTANCE_EQ_WAVEFORMS_HDF5_PATH,
         instance_no_waveforms_hdf5=INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
         instance_eq_metadata_csv=INSTANCE_EQ_METADATA_CSV_PATH,
         instance_no_metadata_csv=INSTANCE_NOISE_METADATA_CSV_PATH,
-        continuous_waveforms_hdf5=CONTINUOUS_WAVEFORMS_HDF5_PATH,
-        continuous_metadata_csv=CONTINUOUS_METADATA_CSV_PATH,
         model_time_window=30.0,
         phase_ensured_crop_ratio=PHASE_PICK_ENSURED_CROP_RATIO,
         phase_ensuring_margin=PHASE_ENSURING_MARGIN,
@@ -116,6 +116,7 @@ class KFoldEnvironment:
         train_val_ratio=TRAIN_VALIDATION_SPLIT,
         test_ratio= TEST_RATIO,
         apply_resampling=APPLY_RESAMPLING,
+        resample_while_keeping_total_waveforms_fixed=False,
         resample_eq_ratio=RESAMPLE_EQ_RATIO,
         freqmin=FREQMIN,
         freqmax=FREQMAX,
@@ -131,6 +132,7 @@ class KFoldEnvironment:
         self.train_val_ratio = train_val_ratio
         self.freqmin = freqmin
         self.freqmax = freqmax
+        self.resample_while_keeping_total_waveforms_fixed = resample_while_keeping_total_waveforms_fixed
         self.apply_resampling = apply_resampling
         self.resample_eq_ratio = resample_eq_ratio
         self.n_chunks = n_chunks
@@ -147,6 +149,14 @@ class KFoldEnvironment:
             self.last_axis = "channels"
             self.dataset_time_window = self.stead_time_window
 
+        if dataset == "custom":
+            metadata = self._parse_stead_metadata(custom_metadata_csv)
+            
+            self.eq_hdf5_path = custom_waveforms_hdf5
+            self.no_hdf5_path = custom_waveforms_hdf5
+            self.last_axis = "channels"
+            self.dataset_time_window = self.stead_time_window
+            
         if dataset == "instance":
             metadata = self._parse_instance_metadata(
                 instance_eq_metadata_csv, instance_no_metadata_csv
@@ -156,14 +166,6 @@ class KFoldEnvironment:
             self.no_hdf5_path = instance_no_waveforms_hdf5
             self.last_axis = "timesteps"
             self.dataset_time_window = self.instance_time_window
-
-        if dataset == "continuous":
-            metadata = self._parse_continuous_metadata(continuous_metadata_csv)
-            
-            self.eq_hdf5_path = continuous_waveforms_hdf5
-            self.no_hdf5_path = continuous_waveforms_hdf5  # Same file, like STEAD
-            self.last_axis = "channels"
-            self.dataset_time_window = self.model_time_window  # Should be already windowed to 30s
 
         # This function returns two list of lists. Each list is a chunk list for a split.
         # First list is for training and validation while the second list is for testing.
@@ -346,9 +348,12 @@ class KFoldEnvironment:
         metadata_list = []
         for chunk in chunks:
             metadata_list.append(self.chunk_metadata_list[chunk])
-
-        return pd.concat(metadata_list)
-
+        
+        if len(metadata_list) > 0:
+            return pd.concat(metadata_list)
+        else:
+            return pd.DataFrame()
+        
     def _split_dataset_to_chunks(self, dataset_metadata, colname, random_state=0):
         """
         Splits the dataset metadata into chunks based on the unique values of the column named colname.
@@ -495,36 +500,6 @@ class KFoldEnvironment:
 
         standardized_metadata = pd.concat([eq_metadata, no_metadata])
         return standardized_metadata
-
-    def _parse_continuous_metadata(self, metadata_csv):
-            '''
-            Parses the metadata of continuous dataset and transforms columns
-            to enable generic handling.
-            
-            Parameters
-            ----------
-            metadata_csv : str
-                Path to the CSV file containing continuous data metadata
-                
-            Returns
-            -------
-            metadata : pandas.DataFrame
-                Standardized metadata dataframe
-            '''
-            metadata = pd.read_csv(metadata_csv)
-            
-            # Continuous data already has proper column names from preprocessor
-            # Just need to ensure source_id handling
-            eq_metadata = metadata[metadata.label == "eq"].copy()
-            no_metadata = metadata[metadata.label == "no"].copy()
-            
-            # For noise traces, source_id is already set to trace_name
-            # For eq traces, we might want to group by actual earthquake events
-            # but for now, source_id is already handled by preprocessor
-            
-            standardized_metadata = pd.concat([eq_metadata, no_metadata])
-            
-            return standardized_metadata
 
     def _make_chunk_metadata_multiple_of_batch_size(self, chunk_metadata_list):
         """
@@ -676,14 +651,25 @@ class KFoldEnvironment:
             eq_chunk_metadata = chunk_metadata[chunk_metadata.label == "eq"]
             no_chunk_metadata = chunk_metadata[chunk_metadata.label == "no"]
             
-            num_samples = min(len(eq_chunk_metadata), len(no_chunk_metadata))
+            num_eqs = len(eq_chunk_metadata)
+            num_nos = len(no_chunk_metadata)
             
-            no_ratio = 1. - self.resample_eq_ratio
-            num_nos = int(no_ratio * num_samples)
-            num_eqs = int(self.resample_eq_ratio * num_samples) 
+            if self.resample_while_keeping_total_waveforms_fixed:
+                dest_num_waveforms = min(num_eqs, num_nos)
+                dest_num_eqs = int(dest_num_waveforms * self.resample_eq_ratio)
+                dest_num_nos = int(dest_num_waveforms * (1. - self.resample_eq_ratio))
+            else:
+                eq_to_noise_ratio = self.resample_eq_ratio / (1. - self.resample_eq_ratio)
+                dest_num_nos =int(num_eqs / eq_to_noise_ratio)
             
-            eq_chunk_metadata = eq_chunk_metadata.sample(n=num_eqs, random_state=0)
-            no_chunk_metadata = no_chunk_metadata.sample(n=num_nos, random_state=0)
+                if dest_num_nos <= num_nos:
+                    dest_num_eqs = num_eqs
+                else:
+                    dest_num_nos = num_nos
+                    dest_num_eqs = int(num_nos * eq_to_noise_ratio) 
+                            
+            eq_chunk_metadata = eq_chunk_metadata.sample(n=dest_num_eqs, random_state=0)
+            no_chunk_metadata = no_chunk_metadata.sample(n=dest_num_nos, random_state=0)
             
             resampled_metadata = pd.concat([eq_chunk_metadata, no_chunk_metadata], axis=0)
             resampled_chunk_metadata_list.append(resampled_metadata)

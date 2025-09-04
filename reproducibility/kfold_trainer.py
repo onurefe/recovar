@@ -28,6 +28,7 @@ class KfoldTrainer:
         epochs,
         apply_resampling=False,
         resampling_eq_ratio=0.5,
+        resample_while_keeping_total_waveforms_fixed=False,
         learning_rate=1e-4,
         epsilon=1e-7,
         beta_1=0.99,
@@ -40,6 +41,7 @@ class KfoldTrainer:
         self.epochs = epochs
         self.apply_resampling = apply_resampling
         self.resampling_eq_ratio = resampling_eq_ratio
+        self.resample_while_keeping_total_waveforms_fixed = resample_while_keeping_total_waveforms_fixed
         self.learning_rate = learning_rate
         self.epsilon = epsilon
         self.beta_1 = beta_1
@@ -53,7 +55,8 @@ class KfoldTrainer:
         kfold_env = KFoldEnvironment(
             dataset=self.dataset,
             apply_resampling=self.apply_resampling,
-            resample_eq_ratio=self.resampling_eq_ratio
+            resample_eq_ratio=self.resampling_eq_ratio,
+            resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed
         )
 
         (

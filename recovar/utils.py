@@ -21,5 +21,6 @@ def l2_distance(x, y, axis=[1, 2]):
 def l4_distance(x, y, axis=[1, 2]):
     x = demean(x)
     y = demean(y)
+
     distance = tf.sqrt(tf.sqrt(tf.reduce_mean(tf.square(tf.square(x - y)), axis=axis)))
     return distance

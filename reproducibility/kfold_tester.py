@@ -17,6 +17,7 @@ class KFoldTester:
         split,
         epochs,
         apply_resampling,
+        resample_while_keeping_total_waveforms_fixed,
         resample_eq_ratio,
         method_params={},
     ):
@@ -28,6 +29,7 @@ class KFoldTester:
         self.split = split
         self.epochs = epochs
         self.method_params = method_params
+        self.resample_while_keeping_total_waveforms_fixed = resample_while_keeping_total_waveforms_fixed
         self.apply_resampling = apply_resampling
         self.resample_eq_ratio = resample_eq_ratio
         
@@ -53,9 +55,11 @@ class KFoldTester:
 
     def _predict(self, classifier_model, predict_gen):
         outputs = []
-        for i in range(predict_gen.__len__()):
+        n_batches = predict_gen.__len__()
+        for i in range(n_batches):
             x = predict_gen.__getitem__(i)
             y = classifier_model(x)
+            print(f"Prediction completed:{i}/{n_batches}")
             outputs.append(y)
         
         output = np.concatenate(outputs, axis=0)
@@ -124,7 +128,8 @@ class KFoldTester:
     def _add_test_environment(self):
         self.test_environment = KFoldEnvironment(self.test_dataset,
                                                  apply_resampling=self.apply_resampling,
-                                                 resample_eq_ratio=self.resample_eq_ratio)
+                                                 resample_eq_ratio=self.resample_eq_ratio,
+                                                 resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed)
 
     def _get_exp_results_dir(self):
         return get_exp_results_dir(
