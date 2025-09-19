@@ -19,9 +19,11 @@ class KFoldTester:
         apply_resampling,
         resample_while_keeping_total_waveforms_fixed,
         resample_eq_ratio,
+        dataset_id=None,
         method_params={},
     ):
         self.exp_name = exp_name
+        self.dataset_id = dataset_id
         self.representation_learning_model_class = representation_learning_model_class
         self.classifer_model_class = classifier_model_class
         self.train_dataset = train_dataset
@@ -127,6 +129,7 @@ class KFoldTester:
 
     def _add_test_environment(self):
         self.test_environment = KFoldEnvironment(self.test_dataset,
+                                                 dataset_id=self.dataset_id,
                                                  apply_resampling=self.apply_resampling,
                                                  resample_eq_ratio=self.resample_eq_ratio,
                                                  resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed)

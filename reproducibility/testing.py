@@ -15,7 +15,6 @@ CLASSIFIER_MODEL_CLASS = ClassifierMultipleAutoencoder
 
 # Split.
 SPLIT = 0
-
 rows = []
 
 def _eval_resamplings(experiment_prefix, df_path):
@@ -30,6 +29,7 @@ def _eval_resamplings(experiment_prefix, df_path):
                 evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
                                       representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
                                       classifier_model_class = CLASSIFIER_MODEL_CLASS, 
+                                      dataset_id= 'SLVT'
                                       train_dataset = train_set, 
                                       test_dataset = test_set, 
                                       filters = filters, 
@@ -87,6 +87,7 @@ def _plot_roc(experiment_prefix, resample_eq_ratio):
     plt.legend()
     plt.grid(True)
     plt.savefig("tpr-fpr.png")
-    
+STATION_NAMES=['ADVT','ARMT','BGKT','CTKS','ERIK','GELI','GONE','SLVT', 'ADVT_1fold']
 #_plot_roc("exp_resample_eq_ratio", 0.1)
-_eval_resamplings("exp_instance_resample_eq_ratio", "/home/onur/Code/recovar/resampling_vs_score.csv")  
+for STATION in STATION_NAMES:
+    _eval_resamplings('exp_'+STATION, f"/home/ege/recovar/ADVT_resample_station_scores.csv")  
