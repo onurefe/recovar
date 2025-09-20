@@ -37,6 +37,7 @@ class KfoldTrainer:
     ):
         self.exp_name = exp_name
         self.model_class = model_class
+        self.dataset_id = dataset_id
         self.dataset = dataset
         self.split = split
         self.epochs = epochs

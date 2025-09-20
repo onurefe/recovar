@@ -294,7 +294,7 @@ class Evaluator:
             train_dataset=self.train_dataset,
             test_dataset=self.test_dataset,
             split=self.split,
-            dataset_id=self.dataset_id
+            dataset_id=self.dataset_id,
             epochs=self.epochs,
             resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed,
             method_params=self.method_params,

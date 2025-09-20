@@ -141,6 +141,7 @@ class KFoldEnvironment:
         self._batch_size = batch_size
         self._n_splits = n_splits
         self._dataset = dataset
+        self.dataset_id = dataset_id
 
         if dataset == "stead":
             metadata = self._parse_stead_metadata(stead_metadata_csv)
@@ -549,6 +550,7 @@ class KFoldEnvironment:
         makedirs(processed_hdf5_dir, exist_ok=True)
 
         # Creates the path of the preprocessed dataset.
+        identifier = self.dataset_id or self.dataset
         if self.apply_resampling:
             processed_hdf5_path = join(
                 processed_hdf5_dir,
