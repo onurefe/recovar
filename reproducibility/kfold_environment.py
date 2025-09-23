@@ -635,17 +635,7 @@ class KFoldEnvironment:
 
     def _resample(self, chunk_metadata_list):
         """
-        Resamples the chunk dataframes.
-
-        Parameters
-        ----------
-        chunk_metadata_list : list
-            A list of chunk dataframes.
-
-        Returns
-        -------
-        list
-            A list of resampled chunk dataframes.
+        Resamples the chunk dataframes to achieve desired earthquake/noise ratio.
         """
         resampled_chunk_metadata_list = []
 
@@ -655,25 +645,16 @@ class KFoldEnvironment:
             
             num_eqs = len(eq_chunk_metadata)
             num_nos = len(no_chunk_metadata)
+            total_samples = num_eqs + num_nos
             
-            if self.resample_while_keeping_total_waveforms_fixed:
-                dest_num_waveforms = min(num_eqs, num_nos)
-                dest_num_eqs = int(dest_num_waveforms * self.resample_eq_ratio)
-                dest_num_nos = int(dest_num_waveforms * (1. - self.resample_eq_ratio))
-            else:
-                eq_to_noise_ratio = self.resample_eq_ratio / (1. - self.resample_eq_ratio)
-                dest_num_nos =int(num_eqs / eq_to_noise_ratio)
+            target_num_eqs = int(total_samples * self.resample_eq_ratio)
+            target_num_nos = total_samples - target_num_eqs
             
-                if dest_num_nos <= num_nos:
-                    dest_num_eqs = num_eqs
-                else:
-                    dest_num_nos = num_nos
-                    dest_num_eqs = int(num_nos * eq_to_noise_ratio) 
-                            
-            eq_chunk_metadata = eq_chunk_metadata.sample(n=dest_num_eqs, random_state=0)
-            no_chunk_metadata = no_chunk_metadata.sample(n=dest_num_nos, random_state=0)
+            #Resample with replacement (replace=True allows oversampling) meaning same waveform can be sampled more than once
+            eq_resampled = eq_chunk_metadata.sample(n=target_num_eqs, replace=True, random_state=0)
+            no_resampled = no_chunk_metadata.sample(n=target_num_nos, replace=True, random_state=0)
             
-            resampled_metadata = pd.concat([eq_chunk_metadata, no_chunk_metadata], axis=0)
+            resampled_metadata = pd.concat([eq_resampled, no_resampled], axis=0)
             resampled_chunk_metadata_list.append(resampled_metadata)
 
         return resampled_chunk_metadata_list
