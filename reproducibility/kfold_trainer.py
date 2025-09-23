@@ -26,6 +26,7 @@ class KfoldTrainer:
         dataset,
         split,
         epochs,
+        dataset_id=None,
         apply_resampling=False,
         resampling_eq_ratio=0.5,
         resample_while_keeping_total_waveforms_fixed=False,
@@ -36,6 +37,7 @@ class KfoldTrainer:
     ):
         self.exp_name = exp_name
         self.model_class = model_class
+        self.dataset_id = dataset_id
         self.dataset = dataset
         self.split = split
         self.epochs = epochs
@@ -54,6 +56,7 @@ class KfoldTrainer:
     ):
         kfold_env = KFoldEnvironment(
             dataset=self.dataset,
+            dataset_id=self.dataset_id,
             apply_resampling=self.apply_resampling,
             resample_eq_ratio=self.resampling_eq_ratio,
             resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed

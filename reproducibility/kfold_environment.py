@@ -94,6 +94,7 @@ class KFoldEnvironment:
     def __init__(
         self,
         dataset,
+        dataset_id=None,
         preprocessed_dataset_directory=PREPROCESSED_DATASET_DIRECTORY,
         batch_size=BATCH_SIZE,
         stead_time_window=STEAD_TIME_WINDOW,
@@ -140,6 +141,7 @@ class KFoldEnvironment:
         self._batch_size = batch_size
         self._n_splits = n_splits
         self._dataset = dataset
+        self.dataset_id = dataset_id
 
         if dataset == "stead":
             metadata = self._parse_stead_metadata(stead_metadata_csv)
@@ -207,18 +209,18 @@ class KFoldEnvironment:
 
         # Saves the chunk dataframes.
         makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
+        identifier = dataset_id or self.dataset
         if self.apply_resampling:
             metadata_path = join(
                 self.preprocessed_dataset_directory, 
                 self.dataset, 
-                "resampled_eq{}_subsampled_{}percent.csv".format(int(100 * self.resample_eq_ratio),
-                                                                int(100 * self.subsampling_factor)),
+                f"{identifier}_resampled_eq{int(100 * self.resample_eq_ratio)}_subsampled_{int(100 * self.subsampling_factor)}percent.csv"
             )
         else:
             metadata_path = join(
                 self.preprocessed_dataset_directory, 
                 self.dataset, 
-                "subsampled_{}percent.csv".format(int(100 * self.subsampling_factor)),
+                f"{identifier}_subsampled_{int(100 * self.subsampling_factor)}percent.csv"
             )
             
         if not exists(metadata_path):
@@ -548,16 +550,16 @@ class KFoldEnvironment:
         makedirs(processed_hdf5_dir, exist_ok=True)
 
         # Creates the path of the preprocessed dataset.
+        identifier = self.dataset_id or self.dataset
         if self.apply_resampling:
             processed_hdf5_path = join(
                 processed_hdf5_dir,
-                "resampled_eq{}_subsampled_{}percent.hdf5".format(int(100 * self.resample_eq_ratio),
-                                                                  int(100 * self.subsampling_factor)),
+                f"{identifier}_resampled_eq{int(100 * self.resample_eq_ratio)}_subsampled_{int(100 * self.subsampling_factor)}percent.hdf5"
             )
         else:
             processed_hdf5_path = join(
                 processed_hdf5_dir,
-                "subsampled_{}percent.hdf5".format(int(100 * self.subsampling_factor)),
+                f"{identifier}_subsampled_{int(100 * self.subsampling_factor)}percent.hdf5"
             )
         
         # Creates preprocessed dataset if not exists. Otherwise, loads it.

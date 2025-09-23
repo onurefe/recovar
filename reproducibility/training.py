@@ -9,25 +9,25 @@ from config import KFOLD_SPLITS
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]
 
 # Should be stead or instance.
-DATASETS = ["instance"]
+DATASETS = ["custom"]
 
 # Number of epochs
-NUM_EPOCHS = 40
-
+NUM_EPOCHS = 10
 # For all splits, train the model over defined datasets.
 for eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
     for train_dataset in DATASETS:
         for model_class in MODEL_CLASSES:
             for split in range(1):
-                exp_name = f"exp_instance_resample_eq_ratio{eq_ratio}"
+                exp_name = f"exp_SLVT_resample_eq_ratio{eq_ratio}"
                 kfold_trainer = KfoldTrainer(
-                    exp_name, 
+                    exp_name,
+                    dataset_id="SLVT",
                     model_class, 
                     train_dataset, 
                     split, 
                     epochs=NUM_EPOCHS, 
                     apply_resampling=True, 
-                    resample_while_keeping_total_waveforms_fixed=True,
+                    resample_while_keeping_total_waveforms_fixed=False,
                     resampling_eq_ratio=eq_ratio
                 )
                 kfold_trainer.train()

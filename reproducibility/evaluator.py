@@ -204,6 +204,7 @@ class Evaluator:
         filters,
         split,
         method_params,
+        dataset_id=None,
         epochs=None,
         report_best_val_score_epoch=False,
         apply_resampling=False,
@@ -214,6 +215,7 @@ class Evaluator:
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.filters = filters
+        self.dataset_id = dataset_id
         self.epochs = epochs
         self.split = split
         self.apply_resampling = apply_resampling
@@ -292,6 +294,7 @@ class Evaluator:
             train_dataset=self.train_dataset,
             test_dataset=self.test_dataset,
             split=self.split,
+            dataset_id=self.dataset_id,
             epochs=self.epochs,
             resample_while_keeping_total_waveforms_fixed=self.resample_while_keeping_total_waveforms_fixed,
             method_params=self.method_params,
