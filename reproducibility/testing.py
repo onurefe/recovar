@@ -18,18 +18,18 @@ SPLIT = 0
 rows = []
 
 def _eval_resamplings(experiment_prefix, df_path):
-    for train_set in ["instance"]:
-        for test_set in ["instance"]:
-            for resample_eq_ratio in [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+    for train_set in ["custom"]:
+        for test_set in ["custom"]:
+            for resample_eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
                 if test_set == "custom": 
-                    filters = [CropOffsetFilter(), LastEarthquakeFilter()]
+                    filters = [CropOffsetFilter()]#, LastEarthquakeFilter()]
                 else:
                     filters = [CropOffsetFilter()]
                     
                 evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
                                       representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
                                       classifier_model_class = CLASSIFIER_MODEL_CLASS, 
-                                      dataset_id= 'SLVT'
+                                      dataset_id= 'ERIK_fixed',
                                       train_dataset = train_set, 
                                       test_dataset = test_set, 
                                       filters = filters, 
@@ -87,7 +87,6 @@ def _plot_roc(experiment_prefix, resample_eq_ratio):
     plt.legend()
     plt.grid(True)
     plt.savefig("tpr-fpr.png")
-STATION_NAMES=['ADVT','ARMT','BGKT','CTKS','ERIK','GELI','GONE','SLVT', 'ADVT_1fold']
 #_plot_roc("exp_resample_eq_ratio", 0.1)
-for STATION in STATION_NAMES:
-    _eval_resamplings('exp_'+STATION, f"/home/ege/recovar/ADVT_resample_station_scores.csv")  
+#for STATION in ['SLVT']:#['ADVT','ERIK','SLVT']:
+_eval_resamplings(f'exp_ERIK_fixed_resample_eq_ratio_', f"/home/ege/recovar/ERIK_resample_fixed_station_scores.csv")  
