@@ -17,35 +17,31 @@ CLASSIFIER_MODEL_CLASS = ClassifierMultipleAutoencoder
 SPLIT = 0
 rows = []
 
-def _eval_resamplings(experiment_prefix, df_path):
-    for train_set in ["custom"]:
-        for test_set in ["custom"]:
-            for resample_eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
-                if test_set == "custom": 
-                    filters = [CropOffsetFilter()]#, LastEarthquakeFilter()]
-                else:
-                    filters = [CropOffsetFilter()]
-                    
-                evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
-                                      representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
-                                      classifier_model_class = CLASSIFIER_MODEL_CLASS, 
-                                      train_dataset = train_set, 
-                                      test_dataset = test_set, 
-                                      filters = filters, 
-                                      split = SPLIT,
-                                      apply_resampling=True,
-                                      resample_eq_ratio=resample_eq_ratio,
-                                      resample_while_keeping_total_waveforms_fixed=True,
-                                      report_best_val_score_epoch=True,
-                                      method_params={})
+def _eval_cross_testing(train_dataset, test_dataset, df_path):
+    rows = []
+    for resample_eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
+        filters = [CropOffsetFilter()]
 
-                roc_vectors = evaluator.get_roc_vectors()
-                roc_auc = auc(roc_vectors[0]["fpr"], roc_vectors[0]["tpr"])
+        evaluator = Evaluator(exp_name = f"exp_{train_dataset}_resample_eq_ratio_{resample_eq_ratio}",
+                              representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS,
+                              classifier_model_class = CLASSIFIER_MODEL_CLASS,
+                              train_dataset = train_dataset,
+                              test_dataset = test_dataset,
+                              filters = filters,
+                              split = SPLIT,
+                              apply_resampling=True,
+                              resample_eq_ratio=resample_eq_ratio,
+                              resample_while_keeping_total_waveforms_fixed=True,
+                              report_best_val_score_epoch=True,
+                              method_params={})
 
-                rows.append({"train_set": train_set, 
-                             "test_set": test_set, 
-                             "resample_eq_ratio": resample_eq_ratio,
-                             "roc_auc": roc_auc})
+        roc_vectors = evaluator.get_roc_vectors()
+        roc_auc = auc(roc_vectors[0]["fpr"], roc_vectors[0]["tpr"])
+
+        rows.append({"train_dataset": train_dataset,
+                     "test_dataset": test_dataset,
+                     "resample_eq_ratio": resample_eq_ratio,
+                     "roc_auc": roc_auc})
 
     scores_df = pd.DataFrame(rows)
     scores_df.to_csv(df_path)
@@ -86,6 +82,12 @@ def _plot_roc(experiment_prefix, resample_eq_ratio):
     plt.legend()
     plt.grid(True)
     plt.savefig("tpr-fpr.png")
-#_plot_roc("exp_resample_eq_ratio", 0.1)
-#for STATION in ['SLVT']:#['ADVT','ERIK','SLVT']:
-_eval_resamplings(f'exp_ERIK_fixed_resample_eq_ratio_', f"/home/ege/recovar/ERIK_resample_fixed_station_scores.csv")  
+# Cross-testing examples:
+# Test ERIK model on ERIK data (same-dataset validation)
+_eval_cross_testing("erik_fixed", "erik_fixed", "/home/ege/recovar/erik_on_erik_scores.csv")
+
+# Test ERIK model on ADVT data (cross-testing)
+_eval_cross_testing("erik_fixed", "advt_fixed", "/home/ege/recovar/erik_on_advt_scores.csv")
+
+# Test ERIK model on SLVT data (cross-testing)
+_eval_cross_testing("erik_fixed", "slvt_fixed", "/home/ege/recovar/erik_on_slvt_scores.csv")  
