@@ -209,7 +209,7 @@ class KFoldEnvironment:
 
         # Saves the chunk dataframes.
         makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
-        identifier = dataset_id or self.dataset
+        identifier = self.dataset_id or self.dataset
         if self.apply_resampling:
             metadata_path = join(
                 self.preprocessed_dataset_directory, 
