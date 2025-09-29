@@ -94,7 +94,6 @@ class KFoldEnvironment:
     def __init__(
         self,
         dataset,
-        dataset_id=None,
         preprocessed_dataset_directory=PREPROCESSED_DATASET_DIRECTORY,
         batch_size=BATCH_SIZE,
         stead_time_window=STEAD_TIME_WINDOW,
@@ -141,7 +140,6 @@ class KFoldEnvironment:
         self._batch_size = batch_size
         self._n_splits = n_splits
         self._dataset = dataset
-        self.dataset_id = dataset_id
 
         if dataset == "stead":
             metadata = self._parse_stead_metadata(stead_metadata_csv)
@@ -209,7 +207,7 @@ class KFoldEnvironment:
 
         # Saves the chunk dataframes.
         makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
-        identifier = self.dataset_id or self.dataset
+        identifier = self.dataset
         if self.apply_resampling:
             metadata_path = join(
                 self.preprocessed_dataset_directory, 
@@ -550,7 +548,7 @@ class KFoldEnvironment:
         makedirs(processed_hdf5_dir, exist_ok=True)
 
         # Creates the path of the preprocessed dataset.
-        identifier = self.dataset_id or self.dataset
+        identifier = self.dataset
         if self.apply_resampling:
             processed_hdf5_path = join(
                 processed_hdf5_dir,

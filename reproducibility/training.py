@@ -24,7 +24,7 @@ for eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
                     model_class, 
                     train_dataset, 
                     split,
-                    dataset_id="ERIK_fixed", 
+ 
                     epochs=NUM_EPOCHS, 
                     apply_resampling=True, 
                     resample_while_keeping_total_waveforms_fixed=True,

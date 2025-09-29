@@ -29,7 +29,6 @@ def _eval_resamplings(experiment_prefix, df_path):
                 evaluator = Evaluator(exp_name = f"{experiment_prefix}{resample_eq_ratio}", 
                                       representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS, 
                                       classifier_model_class = CLASSIFIER_MODEL_CLASS, 
-                                      dataset_id= 'ERIK_fixed',
                                       train_dataset = train_set, 
                                       test_dataset = test_set, 
                                       filters = filters, 
