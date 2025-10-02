@@ -22,10 +22,9 @@ from directory import (
     INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
     INSTANCE_EQ_METADATA_CSV_PATH,
     INSTANCE_NOISE_METADATA_CSV_PATH,
-    CUSTOM_WAVEFORMS_HDF5_PATH,
-    CUSTOM_METADATA_CSV_PATH,
     PREPROCESSED_DATASET_DIRECTORY,
 )
+import json
 
 from data_generator import (
     DataGenerator,
@@ -94,15 +93,12 @@ class KFoldEnvironment:
     def __init__(
         self,
         dataset,
-        dataset_id=None,
         preprocessed_dataset_directory=PREPROCESSED_DATASET_DIRECTORY,
         batch_size=BATCH_SIZE,
         stead_time_window=STEAD_TIME_WINDOW,
         instance_time_window=INSTANCE_TIME_WINDOW,
         stead_waveforms_hdf5=STEAD_WAVEFORMS_HDF5_PATH,
         stead_metadata_csv=STEAD_METADATA_CSV_PATH,
-        custom_waveforms_hdf5 = CUSTOM_WAVEFORMS_HDF5_PATH,
-        custom_metadata_csv=CUSTOM_METADATA_CSV_PATH,
         instance_eq_waveforms_hdf5=INSTANCE_EQ_WAVEFORMS_HDF5_PATH,
         instance_no_waveforms_hdf5=INSTANCE_NOISE_WAVEFORMS_HDF5_PATH,
         instance_eq_metadata_csv=INSTANCE_EQ_METADATA_CSV_PATH,
@@ -122,6 +118,9 @@ class KFoldEnvironment:
         freqmin=FREQMIN,
         freqmax=FREQMAX,
     ):
+        with open("settings.json", 'r') as file:
+            settings = json.load(file)
+
         self.preprocessed_dataset_directory = preprocessed_dataset_directory
         self.model_time_window = model_time_window
         self.phase_ensured_crop_ratio = phase_ensured_crop_ratio
@@ -141,7 +140,6 @@ class KFoldEnvironment:
         self._batch_size = batch_size
         self._n_splits = n_splits
         self._dataset = dataset
-        self.dataset_id = dataset_id
 
         if dataset == "stead":
             metadata = self._parse_stead_metadata(stead_metadata_csv)
@@ -151,15 +149,16 @@ class KFoldEnvironment:
             self.last_axis = "channels"
             self.dataset_time_window = self.stead_time_window
 
-        if dataset == "custom":
-            metadata = self._parse_stead_metadata(custom_metadata_csv)
-            
-            self.eq_hdf5_path = custom_waveforms_hdf5
-            self.no_hdf5_path = custom_waveforms_hdf5
+        if dataset in settings.get("CUSTOM_DATASETS", {}):
+            dataset_config = settings["CUSTOM_DATASETS"][dataset]
+            metadata = self._parse_stead_metadata(dataset_config["metadata"])
+
+            self.eq_hdf5_path = dataset_config["waveforms"]
+            self.no_hdf5_path = dataset_config["waveforms"]
             self.last_axis = "channels"
             self.dataset_time_window = self.stead_time_window
-            
-        if dataset == "instance":
+
+        elif dataset == "instance":
             metadata = self._parse_instance_metadata(
                 instance_eq_metadata_csv, instance_no_metadata_csv
             )
@@ -209,7 +208,7 @@ class KFoldEnvironment:
 
         # Saves the chunk dataframes.
         makedirs(join(self.preprocessed_dataset_directory, self.dataset), exist_ok=True)
-        identifier = dataset_id or self.dataset
+        identifier = self.dataset
         if self.apply_resampling:
             metadata_path = join(
                 self.preprocessed_dataset_directory, 
@@ -550,7 +549,7 @@ class KFoldEnvironment:
         makedirs(processed_hdf5_dir, exist_ok=True)
 
         # Creates the path of the preprocessed dataset.
-        identifier = self.dataset_id or self.dataset
+        identifier = self.dataset
         if self.apply_resampling:
             processed_hdf5_path = join(
                 processed_hdf5_dir,

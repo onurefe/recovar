@@ -8,8 +8,8 @@ from config import KFOLD_SPLITS
 # Should be one of the RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder, RepresentationLearningMultipleAutoencoder
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]
 
-# Should be stead or instance.
-DATASETS = ["custom"]
+# Should be stead, instance, or any custom dataset defined in settings.json
+DATASETS = ["erik_fixed"]
 
 # Number of epochs
 NUM_EPOCHS = 20
@@ -18,13 +18,13 @@ for eq_ratio in [0.01, 0.02, 0.03, 0.04, 0.05]:
     for train_dataset in DATASETS:
         for model_class in MODEL_CLASSES:
             for split in range(1):
-                exp_name = f"exp_ERIK_fixed_resample_eq_ratio_{eq_ratio}"
+                exp_name = f"exp_{train_dataset}_resample_eq_ratio_{eq_ratio}"
                 kfold_trainer = KfoldTrainer(
                     exp_name,
                     model_class, 
                     train_dataset, 
                     split,
-                    dataset_id="ERIK_fixed", 
+ 
                     epochs=NUM_EPOCHS, 
                     apply_resampling=True, 
                     resample_while_keeping_total_waveforms_fixed=True,
