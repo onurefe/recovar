@@ -9,7 +9,7 @@ from config import KFOLD_SPLITS
 MODEL_CLASSES = [RepresentationLearningMultipleAutoencoder]
 
 # Should be stead, instance, or any custom dataset defined in settings.json
-DATASETS = ["erik_fixed"]
+DATASETS = ["MERGED_fixed"]
 
 # Number of epochs
 NUM_EPOCHS = 20
