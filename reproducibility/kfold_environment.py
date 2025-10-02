@@ -180,6 +180,8 @@ class KFoldEnvironment:
 
         self.test_splits = test_split_chunks
 
+        metadata = self._add_last_earthquake_time_column(metadata)
+
         # Split the dataset into chunks.
         chunk_metadata_list = self._split_dataset_to_chunks(metadata, "source_id")
 
@@ -779,6 +781,47 @@ class KFoldEnvironment:
         ].min(axis=1)
 
         return _eq_metadata
+
+    def _add_last_earthquake_time_column(self, metadata):
+        """
+        Add last_earthquake_time column to metadata for LastEarthquakeFilter compatibility.
+        For each noise trace, finds the most recent earthquake before its start time.
+
+        Args:
+        metadata : pd.DataFrame
+            Full dataset metadata containing both eq and noise traces.
+
+        Returns:
+        pd.DataFrame
+            Metadata with last_earthquake_time column added.
+        """
+        metadata_with_last_eq = metadata.copy()
+
+        metadata_with_last_eq['last_earthquake_time'] = pd.NaT
+
+        eq_traces = metadata_with_last_eq[metadata_with_last_eq['label'] == 'eq'].copy()
+        noise_traces = metadata_with_last_eq[metadata_with_last_eq['label'] == 'no'].copy()
+
+        if 'trace_start_time' in metadata_with_last_eq.columns:
+            eq_traces['trace_start_time'] = pd.to_datetime(eq_traces['trace_start_time'], format='ISO8601')
+            noise_traces['trace_start_time'] = pd.to_datetime(noise_traces['trace_start_time'], format='ISO8601')
+
+        for noise_idx, noise_trace in noise_traces.iterrows():
+            if 'trace_start_time' in noise_trace and pd.notna(noise_trace['trace_start_time']):
+                noise_start_time = noise_trace['trace_start_time']
+
+                #Find earthquakes that occurred before this noise trace
+                prior_earthquakes = eq_traces[
+                    (eq_traces['trace_start_time'] < noise_start_time) &
+                    (pd.notna(eq_traces['trace_start_time']))
+                ]
+
+                if len(prior_earthquakes) > 0:
+                    #Get the most recent earthquake time
+                    last_eq_time = prior_earthquakes['trace_start_time'].max()
+                    metadata_with_last_eq.loc[noise_idx, 'last_earthquake_time'] = last_eq_time
+
+        return metadata_with_last_eq
 
     def _get_ts(self, t):
         """

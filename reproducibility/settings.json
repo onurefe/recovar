@@ -1,14 +1,14 @@
-{ 
+{
     "CONFIG": {
         "SUBSAMPLING_FACTOR": 1.0,
         "TRAIN_VALIDATION_SPLIT": 0.75,
         "KFOLD_SPLITS": 5,
         "DATASET_CHUNKS": 5,
         "PHASE_PICK_ENSURED_CROP_RATIO": 1.0,
-        "PHASE_ENSURING_MARGIN":6.0,
-        "APPLY_RESAMPLING":true,
-        "RESAMPLE_EQ_RATIO":0.1,
-        "SINGLE_SPLIT_TEST_RATIO":1
+        "PHASE_ENSURING_MARGIN": 6.0,
+        "APPLY_RESAMPLING": true,
+        "RESAMPLE_EQ_RATIO": 0.1,
+        "SINGLE_SPLIT_TEST_RATIO": 1
     },
     "DATASET_DIRECTORIES": {
         "STEAD_WAVEFORMS_HDF5_PATH": "/home/boxx/Public/earthquake_model_evaluations/data/Stead/full/waveforms/test.hdf5",
@@ -16,23 +16,31 @@
         "INSTANCE_NOISE_WAVEFORMS_HDF5_PATH": "/mnt/second_drive/instance_dset/noise.hdf5",
         "INSTANCE_EQ_WAVEFORMS_HDF5_PATH": "/mnt/second_drive/instance_dset/instance.hdf5",
         "INSTANCE_NOISE_METADATA_CSV_PATH": "/mnt/second_drive/instance_dset/metadata_Instance_noise.csv",
-        "INSTANCE_EQ_METADATA_CSV_PATH": "/mnt/second_drive/instance_dset/metadata_Instance_events.csv",
+        "INSTANCE_EQ_METADATA_CSV_PATH": "/mnt/second_drive/instance_dset/metadata_Instance_events.csv"
     },
     "CUSTOM_DATASETS": {
-        "erik_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/ERIK_continuous_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/ERIK_continuous_waveforms.hdf5"
-        },
-        "advt_fixed": {
+        "ADVT_fixed": {
             "metadata": "/home/ege/recovar/benchmarks/output/ADVT_continuous_metadata.csv",
             "waveforms": "/home/ege/recovar/benchmarks/output/ADVT_continuous_waveforms.hdf5"
         },
-        "slvt_fixed": {
+        "BGKT_fixed": {
+            "metadata": "/home/ege/recovar/benchmarks/output/BGKT_continuous_metadata.csv",
+            "waveforms": "/home/ege/recovar/benchmarks/output/BGKT_continuous_waveforms.hdf5"
+        },
+        "ERIK_fixed": {
+            "metadata": "/home/ege/recovar/benchmarks/output/ERIK_continuous_metadata.csv",
+            "waveforms": "/home/ege/recovar/benchmarks/output/ERIK_continuous_waveforms.hdf5"
+        },
+        "SLVT_fixed": {
             "metadata": "/home/ege/recovar/benchmarks/output/SLVT_continuous_metadata.csv",
             "waveforms": "/home/ege/recovar/benchmarks/output/SLVT_continuous_waveforms.hdf5"
+        },
+        "MERGED_fixed": {
+            "metadata": "/home/ege/recovar/benchmarks/output/MERGED_fixed_metadata.csv",
+            "waveforms": "/home/ege/recovar/benchmarks/output/MERGED_fixed_waveforms.hdf5"
         }
     },
-    "PREPROCESSED_DATASET_DIRECTORY": "/home/ege/recovar_data_preprocessed",
-    "TRAINED_MODELS_DIR": "/home/ege/recovar_models",
+    "PREPROCESSED_DATASET_DIRECTORY": "/mnt/data_a/ege/recovar_data_preprocessed",
+    "TRAINED_MODELS_DIR": "/mnt/data_a/ege/recovar_models",
     "RESULTS_DIR": "/home/ege/recovar_results"
 }
