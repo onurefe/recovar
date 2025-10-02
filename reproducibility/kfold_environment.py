@@ -803,8 +803,8 @@ class KFoldEnvironment:
         noise_traces = metadata_with_last_eq[metadata_with_last_eq['label'] == 'no'].copy()
 
         if 'trace_start_time' in metadata_with_last_eq.columns:
-            eq_traces['trace_start_time'] = pd.to_datetime(eq_traces['trace_start_time'])
-            noise_traces['trace_start_time'] = pd.to_datetime(noise_traces['trace_start_time'])
+            eq_traces['trace_start_time'] = pd.to_datetime(eq_traces['trace_start_time'], format='ISO8601')
+            noise_traces['trace_start_time'] = pd.to_datetime(noise_traces['trace_start_time'], format='ISO8601')
 
         for noise_idx, noise_trace in noise_traces.iterrows():
             if 'trace_start_time' in noise_trace and pd.notna(noise_trace['trace_start_time']):
