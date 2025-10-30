@@ -1,5 +1,7 @@
 # Byte-compiled / optimized / DLL files
 reproducibility/continous_results
+reproducibility/bootstrap_results
+reproducibility/phasenet_eqt
 reproducibility/dataset_exploration.ipynb
 __pycache__/
 *.py[cod]
