@@ -77,7 +77,7 @@ class KfoldDynamicTrainer(KfoldTrainer):
         for epoch in range(self.epochs):
 
             epoch_loss = self._train_one_epoch(
-                model, optimizer, train_gen, classifier
+                model, optimizer, train_gen, classifier, epoch
             )
             val_loss = self._validate(model, validation_gen)
 
@@ -89,22 +89,31 @@ class KfoldDynamicTrainer(KfoldTrainer):
             history['loss'].append(float(epoch_loss))
             history['val_loss'].append(float(val_loss))
 
-            #print(f"Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}")
+            print(f"Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}")
 
         self._save_history(self.split, history)
 
-    def _train_one_epoch(self, model, optimizer, train_gen, classifier):
+    def _train_one_epoch(self, model, optimizer, train_gen, classifier, epoch):
         n_batches = len(train_gen)
         epoch_losses = []
 
-        n_super_batches = n_batches // self.batch_multiplier
+        #Start with batch_multiplier, decrease by 1 each epoch until keep_top_batches
+        effective_batch_multiplier = max(
+            self.keep_top_batches,
+            self.batch_multiplier - epoch
+        )
+
+        print(f"Epoch {epoch}: Using batch_multiplier = {effective_batch_multiplier} "
+              f"(keeping top {self.keep_top_batches} batches)")
+
+        n_super_batches = n_batches // effective_batch_multiplier
 
         for super_batch_idx in range(n_super_batches):
             x_batches = []
             y_batches = []
 
-            for mult_idx in range(self.batch_multiplier):
-                batch_idx = super_batch_idx * self.batch_multiplier + mult_idx
+            for mult_idx in range(effective_batch_multiplier):
+                batch_idx = super_batch_idx * effective_batch_multiplier + mult_idx
                 x_batch, y_batch = train_gen[batch_idx]
                 x_batches.append(x_batch)
                 y_batches.append(y_batch)
@@ -159,7 +168,8 @@ class KfoldDynamicTrainer(KfoldTrainer):
 
                 print(f"  Super-batch {super_batch_idx+1}/{n_super_batches}, "
                         f"Loss: {loss:.4f}, "
-                        f"Avg score: {avg_score:.4f}, Top score: {top_score:.4f}")
+                        f"Avg score: {avg_score:.4f}, Top score: {top_score:.4f}, "
+                        f"Batch multiplier: {effective_batch_multiplier}")
 
 
         return np.mean(epoch_losses)
