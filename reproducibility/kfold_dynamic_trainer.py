@@ -97,33 +97,31 @@ class KfoldDynamicTrainer(KfoldTrainer):
         n_batches = len(train_gen)
         epoch_losses = []
 
-        #Start with batch_multiplier, decrease by 1 each epoch until keep_top_batches
-        effective_batch_multiplier = max(
-            self.keep_top_batches,
-            self.batch_multiplier - epoch
-        )
+        #Linear interpolation
+        effective_keep_batches = self.batch_multiplier - (epoch / self.epochs) * (self.batch_multiplier - self.keep_top_batches)
+        effective_keep_batches = int(np.round(effective_keep_batches))
 
-        print(f"Epoch {epoch}: Using batch_multiplier = {effective_batch_multiplier} "
-              f"(keeping top {self.keep_top_batches} batches)")
+        print(f"Epoch {epoch}: Loading {self.batch_multiplier} batches, "
+              f"keeping top {effective_keep_batches} batches")
 
-        n_super_batches = n_batches // effective_batch_multiplier
+        n_super_batches = n_batches // self.batch_multiplier
 
         for super_batch_idx in range(n_super_batches):
             x_batches = []
             y_batches = []
 
-            for mult_idx in range(effective_batch_multiplier):
-                batch_idx = super_batch_idx * effective_batch_multiplier + mult_idx
+            for mult_idx in range(self.batch_multiplier):
+                batch_idx = super_batch_idx * self.batch_multiplier + mult_idx
                 x_batch, y_batch = train_gen[batch_idx]
                 x_batches.append(x_batch)
                 y_batches.append(y_batch)
 
-            x_all = np.concatenate(x_batches, axis=0) 
+            x_all = np.concatenate(x_batches, axis=0)
             y_all = np.concatenate(y_batches, axis=0)
 
             scores = classifier(x_all, training=False)
 
-            n_keep = self.keep_top_batches * BATCH_SIZE
+            n_keep = effective_keep_batches * BATCH_SIZE
             top_indices = np.argsort(scores)[::-1][:n_keep]  #Top n_keep samples
 
             x_selected = x_all[top_indices]
@@ -169,7 +167,7 @@ class KfoldDynamicTrainer(KfoldTrainer):
                 print(f"  Super-batch {super_batch_idx+1}/{n_super_batches}, "
                         f"Loss: {loss:.4f}, "
                         f"Avg score: {avg_score:.4f}, Top score: {top_score:.4f}, "
-                        f"Batch multiplier: {effective_batch_multiplier}")
+                        f"Keeping: {effective_keep_batches}/{self.batch_multiplier} batches")
 
 
         return np.mean(epoch_losses)
