@@ -99,12 +99,12 @@ class KfoldDynamicTrainer(KfoldTrainer):
 
         #Linear interpolation
         effective_keep_batches = self.batch_multiplier - (epoch / self.epochs) * (self.batch_multiplier - self.keep_top_batches)
-        effective_keep_batches = int(np.round(effective_keep_batches))
 
         print(f"Epoch {epoch}: Loading {self.batch_multiplier} batches, "
-              f"keeping top {effective_keep_batches} batches")
+              f"keeping top {effective_keep_batches:.2f} batches ({100*effective_keep_batches/self.batch_multiplier:.1f}%)")
 
         n_super_batches = n_batches // self.batch_multiplier
+        remaining_batches = n_batches % self.batch_multiplier
 
         for super_batch_idx in range(n_super_batches):
             x_batches = []
@@ -121,7 +121,8 @@ class KfoldDynamicTrainer(KfoldTrainer):
 
             scores = classifier(x_all, training=False)
 
-            n_keep = effective_keep_batches * BATCH_SIZE
+            # Calculate exact number of samples to keep from float value
+            n_keep = int(effective_keep_batches * BATCH_SIZE)
             top_indices = np.argsort(scores)[::-1][:n_keep]  #Top n_keep samples
 
             x_selected = x_all[top_indices]
@@ -169,6 +170,61 @@ class KfoldDynamicTrainer(KfoldTrainer):
                         f"Avg score: {avg_score:.4f}, Top score: {top_score:.4f}, "
                         f"Keeping: {effective_keep_batches}/{self.batch_multiplier} batches")
 
+        if remaining_batches > 0:
+            x_batches = []
+            y_batches = []
+
+            for mult_idx in range(remaining_batches):
+                batch_idx = n_super_batches * self.batch_multiplier + mult_idx
+                x_batch, y_batch = train_gen[batch_idx]
+                x_batches.append(x_batch)
+                y_batches.append(y_batch)
+
+            x_all = np.concatenate(x_batches, axis=0)
+            y_all = np.concatenate(y_batches, axis=0)
+
+            scores = classifier(x_all, training=False)
+
+            n_keep = int(effective_keep_batches * BATCH_SIZE * remaining_batches / self.batch_multiplier)
+            n_keep = max(1, n_keep) 
+            top_indices = np.argsort(scores)[::-1][:n_keep]
+
+            x_selected = x_all[top_indices]
+            y_selected = y_all[top_indices]
+
+            with tf.GradientTape() as tape:
+                f1, f2, f3, f4, f5, y1, y2, y3, y4, y5 = model(x_selected, training=True)
+
+                per_sample_recon_loss = (
+                    self._per_sample_l2_distance(x_selected, y1) +
+                    self._per_sample_l2_distance(x_selected, y2) +
+                    self._per_sample_l2_distance(x_selected, y3) +
+                    self._per_sample_l2_distance(x_selected, y4) +
+                    self._per_sample_l2_distance(x_selected, y5)
+                ) / 5.0
+
+                per_sample_ensemble_loss = (
+                    self._per_sample_ensemble_distance(f1, f2) +
+                    self._per_sample_ensemble_distance(f1, f3) +
+                    self._per_sample_ensemble_distance(f2, f3) +
+                    self._per_sample_ensemble_distance(f1, f4) +
+                    self._per_sample_ensemble_distance(f2, f4) +
+                    self._per_sample_ensemble_distance(f3, f4) +
+                    self._per_sample_ensemble_distance(f1, f5) +
+                    self._per_sample_ensemble_distance(f2, f5) +
+                    self._per_sample_ensemble_distance(f3, f5) +
+                    self._per_sample_ensemble_distance(f4, f5)
+                ) / 10.0
+
+                per_sample_total_loss = per_sample_recon_loss + per_sample_ensemble_loss
+                loss = tf.reduce_mean(per_sample_total_loss)
+
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+            epoch_losses.append(float(loss))
+
+            print(f"  Remaining batches: {remaining_batches}, Loss: {loss:.4f}")
 
         return np.mean(epoch_losses)
 
