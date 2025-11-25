@@ -35,59 +35,96 @@ class ContinuousDataPreprocessor:
         self.trace_counter = 0
 
     def process_station(self, station_dir):
-        stream = obspy.read(os.path.join(station_dir, "*.mseed"))
+        # Group files by time range (assumes filename pattern: NET.STA..CHA__STARTTIME__ENDTIME.mseed)
+        import glob
+        mseed_files = glob.glob(os.path.join(station_dir, "*.mseed"))
 
-        if len(stream) == 0:
+        if len(mseed_files) == 0:
+            print(f"No mseed files found in {station_dir}")
             return
-        for tr in stream:
-            tr.data = tr.data.astype(np.float32)
 
-        for tr in stream:
-            if tr.stats.sampling_rate != self.sampling_rate:
-                tr.resample(self.sampling_rate)
+        # Group files by their time signature (everything except channel)
+        file_groups = {}
+        for filepath in mseed_files:
+            filename = os.path.basename(filepath)
+            # Extract time signature by removing channel identifier
+            # Pattern: NET.STA..CHA__TIME__TIME.mseed -> group by NET.STA..CHA__TIME__TIME
+            parts = filename.split('..')
+            if len(parts) >= 2:
+                # Replace channel with wildcard for grouping
+                time_sig = parts[1]  # e.g., "HHN__20191007T235958410000Z__20191009T000003530000Z.mseed"
+                time_sig = time_sig[3:]  # Remove channel identifier (HHN -> "")
+                group_key = parts[0] + time_sig  # e.g., "KO.SLVT__20191007T235958410000Z__20191009T000003530000Z.mseed"
 
-        station_name = stream[0].stats.station
-        network = stream[0].stats.network
+                if group_key not in file_groups:
+                    file_groups[group_key] = []
+                file_groups[group_key].append(filepath)
 
-        z_stream = stream.select(channel="*Z")
-        n_stream = stream.select(channel="*N")
-        e_stream = stream.select(channel="*E")
+        print(f"Found {len(file_groups)} time-matched file groups")
 
-        if not (z_stream and n_stream and e_stream):
-            z_stream = stream.select(channel="*HZ")
-            n_stream = stream.select(channel="*HN")
-            e_stream = stream.select(channel="*HE")
-
-        # Process each segment (trace) from Z channel
         metadata = []
-
         with h5py.File(self.output_hdf5_path, 'a') as h5f:
             if 'data' not in h5f:
                 data_group = h5f.create_group('data')
             else:
                 data_group = h5f['data']
 
-            for z_trace in z_stream:
-                # Find matching N and E traces that overlap with this Z trace
-                segment_start = z_trace.stats.starttime
-                segment_end = z_trace.stats.endtime
+            # Process each group of time-matched files
+            for group_key, file_list in file_groups.items():
+                try:
+                    stream = obspy.Stream()
+                    for filepath in file_list:
+                        stream += obspy.read(filepath)
 
-                # Get N and E traces that overlap with this time period
-                matching_n = self._find_matching_trace(n_stream, segment_start, segment_end)
-                matching_e = self._find_matching_trace(e_stream, segment_start, segment_end)
+                    if len(stream) == 0:
+                        continue
 
-                common_start = max(z_trace.stats.starttime, matching_n.stats.starttime, matching_e.stats.starttime)
-                common_end = min(z_trace.stats.endtime, matching_n.stats.endtime, matching_e.stats.endtime)
+                    for tr in stream:
+                        tr.data = tr.data.astype(np.float32)
+                        if tr.stats.sampling_rate != self.sampling_rate:
+                            tr.resample(self.sampling_rate)
 
-                z_trimmed = z_trace.copy().trim(common_start, common_end)
-                n_trimmed = matching_n.copy().trim(common_start, common_end)
-                e_trimmed = matching_e.copy().trim(common_start, common_end)
+                    station_name = stream[0].stats.station
+                    network = stream[0].stats.network
 
-                segment_metadata = self._process_segment(
-                    z_trimmed, n_trimmed, e_trimmed,
-                    station_name, network, data_group
-                )
-                metadata.extend(segment_metadata)
+                    z_stream = stream.select(channel="*Z")
+                    n_stream = stream.select(channel="*N")
+                    e_stream = stream.select(channel="*E")
+
+                    if not (z_stream and n_stream and e_stream):
+                        z_stream = stream.select(channel="*HZ")
+                        n_stream = stream.select(channel="*HN")
+                        e_stream = stream.select(channel="*HE")
+
+                    if not (z_stream and n_stream and e_stream):
+                        print(f"  Skipping group {group_key}: missing Z/N/E channels")
+                        continue
+
+                    # Use first trace from each channel (should be the only one in this group)
+                    z_trace = z_stream[0]
+                    n_trace = n_stream[0]
+                    e_trace = e_stream[0]
+
+                    common_start = max(z_trace.stats.starttime, n_trace.stats.starttime, e_trace.stats.starttime)
+                    common_end = min(z_trace.stats.endtime, n_trace.stats.endtime, e_trace.stats.endtime)
+
+                    if common_end - common_start < self.window_length:
+                        print(f"  Skipping group: overlap too short ({common_end - common_start}s)")
+                        continue
+
+                    z_trimmed = z_trace.copy().trim(common_start, common_end)
+                    n_trimmed = n_trace.copy().trim(common_start, common_end)
+                    e_trimmed = e_trace.copy().trim(common_start, common_end)
+
+                    segment_metadata = self._process_segment(
+                        z_trimmed, n_trimmed, e_trimmed,
+                        station_name, network, data_group
+                    )
+                    metadata.extend(segment_metadata)
+
+                except Exception as e:
+                    print(f"  Error processing group {group_key}: {e}")
+                    continue
 
         if metadata:
             metadata_df = pd.DataFrame(metadata)
