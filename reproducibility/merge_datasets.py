@@ -70,7 +70,7 @@ def merge_all_custom_datasets(output_name):
     return merge_datasets(dataset_configs, output_name)
 
 if __name__ == "__main__":
-    output_name = "MERGED_fixed"
+    output_name = "SILIVRI2019"
     
     print("Available datasets:")
     with open('/home/ege/recovar/reproducibility/settings.json', 'r') as f:

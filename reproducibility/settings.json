@@ -19,25 +19,77 @@
         "INSTANCE_EQ_METADATA_CSV_PATH": "/mnt/second_drive/instance_dset/metadata_Instance_events.csv"
     },
     "CUSTOM_DATASETS": {
-        "ADVT_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/ADVT_continuous_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/ADVT_continuous_waveforms.hdf5"
-        },
         "BGKT_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/BGKT_continuous_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/BGKT_continuous_waveforms.hdf5"
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/BGKT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/BGKT_continuous_waveforms.hdf5"
         },
         "ERIK_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/ERIK_continuous_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/ERIK_continuous_waveforms.hdf5"
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ERIK_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ERIK_continuous_waveforms.hdf5"
         },
         "SLVT_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/SLVT_continuous_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/SLVT_continuous_waveforms.hdf5"
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/SLVT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/SLVT_continuous_waveforms.hdf5"
         },
-        "MERGED_fixed": {
-            "metadata": "/home/ege/recovar/benchmarks/output/MERGED_fixed_metadata.csv",
-            "waveforms": "/home/ege/recovar/benchmarks/output/MERGED_fixed_waveforms.hdf5"
+        "CTKS_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/CTKS_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/CTKS_continuous_waveforms.hdf5"
+        },
+        "GELI_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/GELI_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/GELI_continuous_waveforms.hdf5"
+        },
+        "GONE_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/GONE_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/GONE_continuous_waveforms.hdf5"
+        },
+        "ISK_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ISK_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ISK_continuous_waveforms.hdf5"
+        },
+        "IZI_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/IZI_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/IZI_continuous_waveforms.hdf5"
+        },
+        "KCTX_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/KCTX_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/KCTX_continuous_waveforms.hdf5"
+        },
+        "KLYT_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/KLYT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/KLYT_continuous_waveforms.hdf5"
+        },
+        "MDNY_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/MDNY_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/MDNY_continuous_waveforms.hdf5"
+        },
+        "MRMT_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/MRMT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/MRMT_continuous_waveforms.hdf5"
+        },
+        "ORLT_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ORLT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/ORLT_continuous_waveforms.hdf5"
+        },
+        "OSMT_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/OSMT_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/OSMT_continuous_waveforms.hdf5"
+        },
+        "TKR_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/TKR_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/TKR_continuous_waveforms.hdf5"
+        },
+        "UKOP_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/UKOP_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/UKOP_continuous_waveforms.hdf5"
+        },
+        "YLV_fixed": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/YLV_continuous_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/YLV_continuous_waveforms.hdf5"
+        },
+        "SILIVRI2019": {
+            "metadata": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/SILIVRI2019_metadata.csv",
+            "waveforms": "/mnt/data_a/ege/RECOVAR_SILIVRI2019/output/SILIVRI2019_waveforms.hdf5"
         }
     },
     "PREPROCESSED_DATASET_DIRECTORY": "/mnt/data_a/ege/recovar_data_preprocessed",
