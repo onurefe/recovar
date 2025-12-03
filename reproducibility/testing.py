@@ -9,7 +9,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Should be RepresentationLearningSingleAutoencoder, RepresentationLearningDenoisingSingleAutoencoder or RepresentationLearningMultipleAutoencoder
 REPRESENTATION_LEARNING_MODEL_CLASS = RepresentationLearningMultipleAutoencoder
 CLASSIFIER_MODEL_CLASS = ClassifierMultipleAutoencoder
 
@@ -18,6 +17,31 @@ SPLIT = 0
 rows = []
 
 def _eval_cross_testing(train_dataset, test_dataset, df_path):
+    rows = []
+    filters = [CropOffsetFilter()]
+
+    evaluator = Evaluator(exp_name = f"exp_{train_dataset}",
+                            representation_learning_model_class=REPRESENTATION_LEARNING_MODEL_CLASS,
+                            classifier_model_class = CLASSIFIER_MODEL_CLASS,
+                            train_dataset = train_dataset,
+                            test_dataset = test_dataset,
+                            filters = filters,
+                            split = SPLIT,
+                            apply_resampling=False,
+                            report_best_val_score_epoch=True,
+                            method_params={})
+
+    roc_vectors = evaluator.get_roc_vectors()
+    roc_auc = auc(roc_vectors[0]["fpr"], roc_vectors[0]["tpr"])
+
+    rows.append({"train_dataset": train_dataset,
+                    "test_dataset": test_dataset,
+                    "roc_auc": roc_auc})
+
+    scores_df = pd.DataFrame(rows)
+    scores_df.to_csv(df_path)
+
+def _eval_cross_testing_resample(train_dataset, test_dataset, df_path):
     rows = []
     for resample_eq_ratio in [0.01,0.02, 0.03, 0.04, 0.05]:
         filters = [CropOffsetFilter()]
