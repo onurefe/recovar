@@ -81,76 +81,8 @@ class SNRFilter(TracesFilter):
         slicer = np.array([x.replace(" ", "") != "" for x in printedlist])
 
         return [float(x) for x in np.array(printedlist)[slicer]]
-    
-class LastEarthquakeFilter(TracesFilter):
-    def __init__(
-        self,
-        offtime_in_seconds = 600.0,
-        window_size_in_seconds=WINDOW_SIZE,
-        sampling_frequency=SAMPLING_FREQ,
-    ):
-        self.offtime_in_seconds = offtime_in_seconds
-        self.window_size_in_samples = int(sampling_frequency * window_size_in_seconds)
-
-    def apply(self, df_traces):
-        _df_traces = df_traces.copy()
-        df_eq_traces, df_no_traces = self._split_eq_and_noise_traces(_df_traces)
-
-        df_no_traces = self._filter_no_traces(df_no_traces)
-
-        return self._merge_eq_and_noise_traces(df_eq_traces, df_no_traces)
-
-    def _filter_no_traces(self, df_no_traces: pd.DataFrame) -> pd.DataFrame:
-        """
-        Keep only those rows whose trace started more than
-        `self.offtime_in_seconds` seconds after the last earthquake.
-
-        Parameters
-        ----------
-        df_no_traces : pd.DataFrame
-            Must contain the columns
-            ``"trace_start_time"`` and ``"last_earthquake_time"``.
-
-        Returns
-        -------
-        pd.DataFrame
-            Filtered frame.
-        """
-        # ------------------------------------------------------------------
-        # 1. Convert the two time‑stamp columns → UTCDateTime or np.nan
-        # ------------------------------------------------------------------
-        trace_start = df_no_traces["trace_start_time"].apply(self._utc_datetime_with_nan)
-        last_eq     = df_no_traces["last_earthquake_time"].apply(self._utc_datetime_with_nan)
-
-        # ------------------------------------------------------------------
-        # 2. Compute time‑offset (seconds) … NaNs propagate safely
-        # ------------------------------------------------------------------
-        off_seconds = pd.Series(
-            [np.nan if pd.isna(ts) or pd.isna(le) else (ts - le)
-            for ts, le in zip(trace_start, last_eq)],
-            index=df_no_traces.index,
-            dtype=float,
-        )
-
-        # ------------------------------------------------------------------
-        # 3. Apply the threshold and return the filtered frame
-        # ------------------------------------------------------------------
-        mask = off_seconds > self.offtime_in_seconds
-        return df_no_traces[mask]
 
 
-    # ----------------------------------------------------------------------
-    # Helper: UTCDateTime or NaN
-    # ----------------------------------------------------------------------
-    @staticmethod
-    def _utc_datetime_with_nan(s):
-        """
-        Convert a string (or timestamp) to ObsPy UTCDateTime.
-        Return np.nan if the value is missing.
-        """
-        return UTCDateTime(s) if pd.notna(s) else np.nan
-
-        
 class CropOffsetFilter(TracesFilter):
     def __init__(
         self,

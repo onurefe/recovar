@@ -1,7 +1,7 @@
 from recovar import RepresentationLearningMultipleAutoencoder
 from recovar import ClassifierMultipleAutoencoder
 from kfold_tester import KFoldTester
-from evaluator import Evaluator, CropOffsetFilter, LastEarthquakeFilter
+from evaluator import Evaluator, CropOffsetFilter
 from sklearn.metrics import auc
 import pandas as pd
 import seaborn as sns
