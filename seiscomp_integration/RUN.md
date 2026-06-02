@@ -1,10 +1,10 @@
-# Running RECOVAR on miniSEED files
+# Running RECOVAR with SeisComP
 
 ---
 
 ## Prerequisites (one-time setup per station)
 
-**1. Start scmaster** (needed for scautopick to read inventory):
+**1. Start scmaster:**
 ```bash
 seiscomp start scmaster
 ```
@@ -49,44 +49,33 @@ seiscomp update-config scautopick
 
 ---
 
-## Running
+## Starting the integration
 
 ```bash
-seiscomp exec recovar_playback --input /path/to/mseeds --output scored_picks.csv
+source ~/.bashrc
+seiscomp start scmaster scdb recovar_pick_filter
 ```
 
-That's it. The module detects picks with scautopick, scores each one with
-RecovAR, and writes the results to CSV.
+Wait for the model to load (~30 s):
+```bash
+tail -f ~/.seiscomp/log/recovar_pick_filter.log
+# Expected: recovar_pick_filter: ready
+```
+
+Once ready, `recovar_pick_filter` listens on the PICK messaging group.
+Every pick detected by scautopick receives a `recovar_score:[0–1]` comment
+attached to the pick object and persisted to the database by scdb.
 
 ---
 
-## Output
-
-`scored_picks.csv` — one row per scored pick:
-
-```
-pick_id,pick_time,net,sta,loc,cha,score
-Pick/...,2022-09-19T18:11:07Z,IU,ANMO,00,HHZ,0.9941
-```
-
-A score near **1** = high-confidence seismic signal. Near **0** = noise.
-
----
-
-## Building test data
-
-To download a mixed set of earthquake and noise waveforms from IRIS:
+## Module management
 
 ```bash
-~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/create_test_archive.py \
-    --output ~/seiscomp_test/sds
-```
-
-Then copy the day files into a flat folder to use with `recovar_playback`:
-
-```bash
-find ~/seiscomp_test/sds -type f | xargs -I{} cp {} ~/seiscomp_test/flat/
-seiscomp exec recovar_playback --input ~/seiscomp_test/flat --output results.csv
+seiscomp start   recovar_pick_filter
+seiscomp stop    recovar_pick_filter
+seiscomp status  recovar_pick_filter
+seiscomp enable  recovar_pick_filter   # auto-start with seiscomp start
+seiscomp disable recovar_pick_filter
 ```
 
 ---
@@ -95,6 +84,7 @@ seiscomp exec recovar_playback --input ~/seiscomp_test/flat --output results.csv
 
 | Symptom | Fix |
 |---|---|
-| `No miniSEED files found` | Check file extensions: `.mseed`, `.ms`, or `.miniseed` |
-| `0 pick(s) detected` | Re-run `seiscomp update-config scautopick`; confirm scmaster is running |
-| Waveform unavailable for a pick | The pick window extends before the file start — normal for picks near the file boundary |
+| `No stations added` in scautopick | Re-run `seiscomp update-config scautopick` |
+| `waveform unavailable` in recovar log | Check `recordStream` in `~/seiscomp/etc/recovar_pick_filter.cfg` |
+| No scored picks in database | Confirm `scdb` is running: `seiscomp status scdb` |
+| `recovar_pick_filter` not starting | Check log: `~/.seiscomp/log/recovar_pick_filter.log` |

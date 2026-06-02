@@ -4,7 +4,7 @@
 # What this script does:
 #   1. Installs system packages (requires sudo)
 #   2. Creates the Python venv and installs dependencies
-#   3. Installs recovar_playback and recovar_batch_test into SeisComP
+#   3. Installs the recovar_pick_filter daemon and recovar_batch_test into SeisComP
 #
 # Prerequisites (done manually beforehand):
 #   - SeisComP installed and set up (seiscomp setup)
@@ -60,10 +60,6 @@ else
     echo "      $SEISCOMP_ROOT/etc/recovar_pick_filter.cfg already exists, skipped"
 fi
 
-cp "$REPO/seiscomp_integration/recovar_playback.py" "$SEISCOMP_ROOT/bin/recovar_playback"
-sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_playback"
-chmod +x "$SEISCOMP_ROOT/bin/recovar_playback"
-echo "      recovar_playback installed"
 
 cp "$REPO/seiscomp_integration/batch_score_test.py" "$SEISCOMP_ROOT/bin/recovar_batch_test"
 sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_batch_test"
