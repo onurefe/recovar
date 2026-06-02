@@ -90,7 +90,7 @@ The script will print `All imports OK` at the end if everything succeeded. You c
 |---|---|
 | 1 | Installs system packages (libboost, mariadb) |
 | 2 | Creates Python 3.10 venv at `~/recovar-seiscomp` with tensorflow, numpy, scipy, obspy |
-| 3 | Installs `recovar_pick_filter` and `recovar_batch_test` binaries to `$SEISCOMP_ROOT/bin/` |
+| 3 | Installs `recovar_pick_filter`, `recovar_batch_test`, and `recovar_playback` binaries to `$SEISCOMP_ROOT/bin/` |
 | 3 | Installs the SeisComP init descriptor to `$SEISCOMP_ROOT/etc/init/` and enables the module |
 | 4 | Writes `recovar_pick_filter.cfg` and `~/.seiscomp/global.cfg` |
 | 5 | Appends SeisComP + RECOVAR environment variables to `~/.bashrc` |
