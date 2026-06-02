@@ -63,6 +63,11 @@ sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_batch_test"
 chmod +x "$SEISCOMP_ROOT/bin/recovar_batch_test"
 echo "      batch test installed at $SEISCOMP_ROOT/bin/recovar_batch_test"
 
+cp "$REPO/seiscomp_integration/recovar_playback.py" "$SEISCOMP_ROOT/bin/recovar_playback"
+sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_playback"
+chmod +x "$SEISCOMP_ROOT/bin/recovar_playback"
+echo "      playback module installed at $SEISCOMP_ROOT/bin/recovar_playback"
+
 cp "$REPO/seiscomp_integration/recovar_pick_filter.py.init" "$SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
 echo "      init descriptor installed at $SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
 
