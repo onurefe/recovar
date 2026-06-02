@@ -36,8 +36,29 @@ python3.10 -m venv "$VENV"
 "$VENV/bin/pip" install --quiet tensorflow==2.14.0 numpy==1.26.0 scipy obspy pymysql
 echo "      venv OK"
 
-# ── Step 3: install binaries ──────────────────────────────────────────────────
+# ── Step 3: install binaries and daemon ──────────────────────────────────────
 echo "[3/3] Installing binaries..."
+
+cp "$REPO/seiscomp_integration/recovar_pick_filter.py" "$SEISCOMP_ROOT/bin/recovar_pick_filter"
+sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_pick_filter"
+chmod +x "$SEISCOMP_ROOT/bin/recovar_pick_filter"
+echo "      recovar_pick_filter installed"
+
+cp "$REPO/seiscomp_integration/recovar_pick_filter.py.init" "$SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
+seiscomp enable recovar_pick_filter
+echo "      recovar_pick_filter enabled as SeisComP daemon"
+
+if [ ! -f "$SEISCOMP_ROOT/etc/recovar_pick_filter.cfg" ]; then
+    cat > "$SEISCOMP_ROOT/etc/recovar_pick_filter.cfg" << EOF
+recovar.modelPath = $REPO/models/representation_cross_covariances.h5
+recordStream      = slink://localhost:18000
+messaging.hostname = localhost
+agencyID = TEST
+EOF
+    echo "      wrote $SEISCOMP_ROOT/etc/recovar_pick_filter.cfg"
+else
+    echo "      $SEISCOMP_ROOT/etc/recovar_pick_filter.cfg already exists, skipped"
+fi
 
 cp "$REPO/seiscomp_integration/recovar_playback.py" "$SEISCOMP_ROOT/bin/recovar_playback"
 sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_playback"
