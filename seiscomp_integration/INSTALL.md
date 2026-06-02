@@ -70,7 +70,7 @@ git clone git@github.com:onurefe/recovar.git ~/recovar
 cd ~/recovar && git checkout seiscomp-integration
 ```
 
-Then run the installer script — it handles the venv, dependencies, pick filter installation, and all config files automatically:
+Then run the installer script — it handles the venv, dependencies, pick filter installation, init descriptor, and all config files automatically:
 
 ```bash
 bash ~/recovar/seiscomp_integration/install.sh
@@ -84,13 +84,30 @@ bash ~/recovar/seiscomp_integration/install.sh --record-stream sdsarchive:///dat
 
 The script will print `All imports OK` at the end if everything succeeded. You can re-run it safely at any time — it skips steps that are already done.
 
+### What the installer does
+
+| Step | Action |
+|---|---|
+| 1 | Installs system packages (libboost, mariadb) |
+| 2 | Creates Python 3.10 venv at `~/recovar-seiscomp` with tensorflow, numpy, scipy, obspy |
+| 3 | Installs `recovar_pick_filter` and `recovar_batch_test` binaries to `$SEISCOMP_ROOT/bin/` |
+| 3 | Installs the SeisComP init descriptor to `$SEISCOMP_ROOT/etc/init/` and enables the module |
+| 4 | Writes `recovar_pick_filter.cfg` and `~/.seiscomp/global.cfg` |
+| 5 | Appends SeisComP + RECOVAR environment variables to `~/.bashrc` |
+
 ---
 
 ## Step 5 — Run
 
 ```bash
 source ~/.bashrc
-~/recovar-seiscomp/bin/python3 ~/seiscomp/bin/recovar_pick_filter
+seiscomp start recovar_pick_filter
+```
+
+Because the module is registered with SeisComP's process manager, you can also start it together with all other enabled modules:
+
+```bash
+seiscomp start
 ```
 
 Watch the log for the ready message:
@@ -107,7 +124,38 @@ recovar_pick_filter: ready
 
 TensorFlow model loading takes up to ~30 seconds on a CPU-only machine.
 
-The module now listens on the PICK messaging group and attaches a `recovar_score:[0–1]` comment to every incoming pick.
+The module subscribes to the PICK messaging group and attaches a `recovar_score:[0–1]` comment to every incoming pick. Scores are persisted to the SeisComP MariaDB database by `scdb` alongside the original pick.
+
+### Module management
+
+```bash
+seiscomp start   recovar_pick_filter
+seiscomp stop    recovar_pick_filter
+seiscomp status  recovar_pick_filter
+seiscomp disable recovar_pick_filter   # prevent auto-start
+seiscomp enable  recovar_pick_filter   # re-enable auto-start
+```
+
+---
+
+## Exporting scored picks
+
+Scored picks are stored in the SeisComP MariaDB database. Use the export script to query them:
+
+```bash
+# All scored picks → scored_picks.csv
+~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/export_scored_picks.py
+
+# Filter by date range
+~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/export_scored_picks.py \
+    --start 2024-01-01 --end 2024-12-31
+
+# Only high-confidence picks
+~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/export_scored_picks.py \
+    --min-score 0.7 --output high_confidence.csv
+```
+
+Output CSV columns: `pick_id, pick_time, net, sta, loc, cha, score`
 
 ---
 
@@ -137,6 +185,30 @@ Start the pick filter (Step 5) and wait up to 30 seconds for:
 ```
 recovar_pick_filter: ready
 ```
+
+### Batch scoring validation
+
+Validates the model's discrimination ability by scoring real earthquake P-arrivals fetched from IRIS and synthetic noise waveforms. Requires internet access.
+
+```bash
+seiscomp exec recovar_batch_test
+```
+
+Or with options:
+
+```bash
+~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/batch_score_test.py \
+    --events 50 --min-mag 6.5 --output batch_results.csv
+```
+
+Expected output (values will vary):
+```
+Earthquakes (n=~10): mean≈0.52  std≈0.28  min≈0.08  max≈0.90
+Noise       (n=10):  mean≈0.07  std≈0.15  min≈0.00  max≈0.51
+Accuracy (eq≥0.5, noise<0.5): ~70%
+```
+
+Earthquake scores vary with epicentral distance — near-regional events (< 30°) score higher than teleseismic events (> 80°) because the P-wave shape differs. This is expected behaviour, not a bug.
 
 ### End-to-end test
 
@@ -191,4 +263,5 @@ PASS   — score 0.9444 >= 0.5 (high-confidence seismic signal)
 | `All imports` check fails | Check that PYTHONPATH in `~/.bashrc` has correct paths and has been sourced |
 | `No plugins loaded` / app hangs | Ensure `core.plugins = dbmysql` is in `~/.seiscomp/global.cfg` |
 | `mysql://mysql://` in log | Remove `mysql://` prefix from `dbstore.read/write` in `~/seiscomp/etc/scmaster.cfg` |
-| `Client name not unique` | A stale instance is running: `~/recovar-seiscomp/bin/python3 -c "import os,signal; os.kill(<PID>, signal.SIGTERM)"` |
+| `Client name not unique` | A stale instance is running: `seiscomp stop recovar_pick_filter` |
+| `recovar_pick_filter: not running` after `seiscomp start` | Check log at `~/.seiscomp/log/recovar_pick_filter.log` for model load errors |

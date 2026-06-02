@@ -51,12 +51,23 @@ python3.10 -m venv "$VENV"
 "$VENV/bin/pip" install --quiet tensorflow==2.14.0 numpy==1.26.0 scipy obspy
 echo "      venv OK"
 
-# ── Step 3: install pick filter binary ───────────────────────────────────────
-echo "[3/5] Installing pick filter..."
+# ── Step 3: install pick filter and batch test binaries ──────────────────────
+echo "[3/5] Installing pick filter and batch test..."
 cp "$REPO/seiscomp_integration/recovar_pick_filter.py" "$SEISCOMP_ROOT/bin/recovar_pick_filter"
 sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_pick_filter"
 chmod +x "$SEISCOMP_ROOT/bin/recovar_pick_filter"
 echo "      pick filter installed at $SEISCOMP_ROOT/bin/recovar_pick_filter"
+
+cp "$REPO/seiscomp_integration/batch_score_test.py" "$SEISCOMP_ROOT/bin/recovar_batch_test"
+sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_batch_test"
+chmod +x "$SEISCOMP_ROOT/bin/recovar_batch_test"
+echo "      batch test installed at $SEISCOMP_ROOT/bin/recovar_batch_test"
+
+cp "$REPO/seiscomp_integration/recovar_pick_filter.py.init" "$SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
+echo "      init descriptor installed at $SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
+
+seiscomp enable recovar_pick_filter
+echo "      recovar_pick_filter enabled"
 
 # ── Step 4: write config files ────────────────────────────────────────────────
 echo "[4/5] Writing config files..."
