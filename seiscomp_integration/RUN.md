@@ -1,12 +1,15 @@
-# Running SeisComP + RECOVAR on a folder of miniSEED files
+# Running RECOVAR on miniSEED files
 
 ---
 
-## Prerequisites (one-time setup)
+## Prerequisites (one-time setup per station)
 
-These steps only need to be done once after installation.
+**1. Start scmaster** (needed for scautopick to read inventory):
+```bash
+seiscomp start scmaster
+```
 
-**Load station inventory:**
+**2. Load station inventory:**
 ```bash
 ~/recovar-seiscomp/bin/python3 -c "
 from obspy.clients.fdsn import Client
@@ -22,7 +25,7 @@ seiscomp exec scinv sync --filebase ~/seiscomp/etc/inventory/ \
     -d mysql://sysop:sysop@localhost/seiscomp
 ```
 
-**Create scautopick bindings:**
+**3. Configure scautopick bindings:**
 ```bash
 cat > ~/seiscomp/etc/key/station_IU_ANMO << 'EOF'
 global:default
@@ -48,18 +51,12 @@ seiscomp update-config scautopick
 
 ## Running
 
-**1. Start SeisComP and RECOVAR:**
-```bash
-source ~/.bashrc
-seiscomp start scmaster scdb recovar_pick_filter
-```
-
-**2. Run the playback module on your miniSEED folder:**
 ```bash
 seiscomp exec recovar_playback --input /path/to/mseeds --output scored_picks.csv
 ```
 
-That's it. The module handles everything: concatenating the files, picking, scoring, and exporting.
+That's it. The module detects picks with scautopick, scores each one with
+RecovAR, and writes the results to CSV.
 
 ---
 
@@ -69,10 +66,28 @@ That's it. The module handles everything: concatenating the files, picking, scor
 
 ```
 pick_id,pick_time,net,sta,loc,cha,score
-Pick/...,2022-09-19 18:11:07,IU,ANMO,00,HHZ,0.9941
+Pick/...,2022-09-19T18:11:07Z,IU,ANMO,00,HHZ,0.9941
 ```
 
-A score near **1** indicates a high-confidence seismic signal. Near **0** indicates noise.
+A score near **1** = high-confidence seismic signal. Near **0** = noise.
+
+---
+
+## Building test data
+
+To download a mixed set of earthquake and noise waveforms from IRIS:
+
+```bash
+~/recovar-seiscomp/bin/python3 ~/recovar/seiscomp_integration/create_test_archive.py \
+    --output ~/seiscomp_test/sds
+```
+
+Then copy the day files into a flat folder to use with `recovar_playback`:
+
+```bash
+find ~/seiscomp_test/sds -type f | xargs -I{} cp {} ~/seiscomp_test/flat/
+seiscomp exec recovar_playback --input ~/seiscomp_test/flat --output results.csv
+```
 
 ---
 
@@ -80,7 +95,6 @@ A score near **1** indicates a high-confidence seismic signal. Near **0** indica
 
 | Symptom | Fix |
 |---|---|
-| `No miniSEED files found` | Check file extensions are `.mseed`, `.ms`, or `.miniseed` |
-| `recovar_pick_filter did not reach ready state` | Check `~/.seiscomp/log/recovar_pick_filter.log` |
-| `No stations added` in scautopick | Re-run `seiscomp update-config scautopick` |
-| 0 scored picks in output | Confirm `scdb` is running: `seiscomp status scdb` |
+| `No miniSEED files found` | Check file extensions: `.mseed`, `.ms`, or `.miniseed` |
+| `0 pick(s) detected` | Re-run `seiscomp update-config scautopick`; confirm scmaster is running |
+| Waveform unavailable for a pick | The pick window extends before the file start — normal for picks near the file boundary |

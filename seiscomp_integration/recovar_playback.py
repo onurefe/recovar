@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-recovar_playback — Run the full scautopick + recovar pipeline over a
-folder of miniSEED files and export scored picks to CSV.
+recovar_playback — Detect picks in miniSEED files using scautopick and
+score each pick with RecovAR. Outputs a CSV of scored picks.
 
 Usage:
     seiscomp exec recovar_playback --input /path/to/mseeds
@@ -11,114 +11,110 @@ Usage:
 import argparse
 import csv
 import os
-import re
 import subprocess
 import sys
 import tempfile
-import time
+import xml.etree.ElementTree as ET
 
-SEISCOMP_ROOT = os.environ.get("SEISCOMP_ROOT", os.path.expanduser("~/seiscomp"))
-CFG_FILE      = os.path.join(SEISCOMP_ROOT, "etc", "recovar_pick_filter.cfg")
-LOG_FILE      = os.path.expanduser("~/.seiscomp/log/recovar_pick_filter.log")
-DB_URL        = "mysql://sysop:sysop@localhost/seiscomp"
+import numpy as np
+from obspy import UTCDateTime, read, Stream
+from scipy.signal import resample as sp_resample
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 sys.path.insert(0, _REPO)
 sys.path.insert(0, _HERE)
 
+from recovar_scorer import RecovARScorer
+
+MODEL_PATH    = os.path.join(_REPO, "models", "representation_cross_covariances.h5")
+DB_URL        = "mysql://sysop:sysop@localhost/seiscomp"
+WINDOW_BEFORE = 5.0
+WINDOW_AFTER  = 25.0
+TARGET_FS     = 100
+N_SAMPLES     = 3000
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def run(cmd, **kwargs):
-    return subprocess.run(cmd, shell=True, capture_output=True, text=True, **kwargs)
+def parse_picks(xml_text):
+    """Parse picks from scautopick --ep SCML output."""
+    picks = []
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return picks
+
+    for elem in root.iter():
+        if elem.tag.split("}")[-1] != "pick":
+            continue
+        try:
+            time_val = next(
+                UTCDateTime(sub.text)
+                for child in elem
+                for sub in child
+                if child.tag.split("}")[-1] == "time"
+                and sub.tag.split("}")[-1] == "value"
+            )
+            wid = next(
+                child for child in elem
+                if child.tag.split("}")[-1] == "waveformID"
+            )
+            picks.append({
+                "id":  elem.get("publicID", ""),
+                "time": time_val,
+                "net": wid.get("networkCode", ""),
+                "sta": wid.get("stationCode", ""),
+                "loc": wid.get("locationCode", ""),
+                "cha": wid.get("channelCode", ""),
+            })
+        except StopIteration:
+            continue
+    return picks
 
 
-def seiscomp(args):
-    return run(f"seiscomp {args}")
+def extract_waveform(stream, pick):
+    """Return a (N_SAMPLES, 3) float32 array centred on the pick, or None."""
+    t0    = pick["time"]
+    t_s   = t0 - WINDOW_BEFORE
+    t_e   = t0 + WINDOW_AFTER
+    band  = pick["cha"][:2]
+    net, sta, loc = pick["net"], pick["sta"], pick["loc"]
 
+    def best(chars):
+        for c in chars:
+            candidates = [
+                tr for tr in stream
+                if tr.stats.network  == net
+                and tr.stats.station  == sta
+                and tr.stats.location == loc
+                and tr.stats.channel.startswith(band)
+                and tr.stats.channel.endswith(c)
+            ]
+            if candidates:
+                return candidates[0]
+        return None
 
-def log(msg):
-    print(f"  {msg}")
+    z  = best(["Z"])
+    h1 = best(["N", "1"])
+    h2 = best(["E", "2"])
+    if any(c is None for c in (z, h1, h2)):
+        return None
 
+    def to_array(tr):
+        sliced = tr.slice(t_s, t_e)
+        if sliced is None or sliced.stats.npts == 0:
+            return np.zeros(N_SAMPLES, dtype=np.float64)
+        arr = sliced.data.astype(np.float64)
+        fs  = sliced.stats.sampling_rate
+        if abs(fs - TARGET_FS) > 0.01:
+            n_out = int(round(len(arr) * TARGET_FS / fs))
+            arr   = sp_resample(arr, n_out)
+        return arr[:N_SAMPLES] if len(arr) >= N_SAMPLES else np.pad(arr, (0, N_SAMPLES - len(arr)))
 
-def update_record_stream(path):
-    """Replace the recordStream line in recovar_pick_filter.cfg."""
-    with open(CFG_FILE) as f:
-        content = f.read()
-    content = re.sub(r"(?m)^recordStream\s*=.*$",
-                     f"recordStream      = {path}", content)
-    with open(CFG_FILE, "w") as f:
-        f.write(content)
-
-
-def wait_for_ready(timeout=60):
-    """Wait until recovar_pick_filter logs 'ready'."""
-    log_offset = os.path.getsize(LOG_FILE) if os.path.exists(LOG_FILE) else 0
-    deadline   = time.time() + timeout
-    while time.time() < deadline:
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE) as f:
-                f.seek(log_offset)
-                if any("pick_filter: ready" in line for line in f):
-                    return True
-        time.sleep(1)
-    return False
-
-
-def wait_for_scores(n_picks, timeout=120):
-    """Wait until at least n_picks recovar_score lines appear in the log."""
-    log_offset = os.path.getsize(LOG_FILE) if os.path.exists(LOG_FILE) else 0
-    deadline   = time.time() + timeout
-    while time.time() < deadline:
-        with open(LOG_FILE) as f:
-            f.seek(log_offset)
-            scored = sum(1 for l in f if "recovar_score=" in l)
-        if scored >= n_picks:
-            return scored
-        time.sleep(1)
-    return scored
-
-
-def count_picks_in_log(log_offset):
-    """Count recovar_score lines written after log_offset."""
-    if not os.path.exists(LOG_FILE):
-        return 0
-    with open(LOG_FILE) as f:
-        f.seek(log_offset)
-        return sum(1 for l in f if "recovar_score=" in l)
-
-
-def export_csv(output):
-    import pymysql as MySQLdb
-    conn = MySQLdb.connect(host="localhost", user="sysop",
-                           password="sysop", database="seiscomp")
-    query = """
-        SELECT
-            po.publicID,
-            CONCAT(p.time_value, '.', LPAD(p.time_value_ms, 3, '0')),
-            p.waveformID_networkCode,
-            p.waveformID_stationCode,
-            p.waveformID_locationCode,
-            p.waveformID_channelCode,
-            CAST(REPLACE(c.text, 'recovar_score:', '') AS DECIMAL(6,4))
-        FROM Pick p
-        JOIN PublicObject po ON po._oid = p._oid
-        JOIN Comment c       ON c._parent_oid = p._oid
-        WHERE c.text LIKE 'recovar_score:%%'
-        ORDER BY p.time_value
-    """
-    with conn:
-        cur = conn.cursor()
-        cur.execute(query)
-        rows = cur.fetchall()
-    with open(output, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["pick_id", "pick_time", "net", "sta", "loc", "cha", "score"])
-        w.writerows(rows)
-    return len(rows)
+    return np.stack([to_array(z), to_array(h1), to_array(h2)], axis=-1).astype(np.float32)
 
 
 # ---------------------------------------------------------------------------
@@ -127,100 +123,82 @@ def export_csv(output):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Run scautopick + recovar over a folder of miniSEED files.")
+        description="Score seismic picks detected by scautopick using RecovAR.")
     p.add_argument("--input",  required=True,
-                   help="Folder containing miniSEED files (*.mseed / *.MSEED)")
+                   help="Folder containing miniSEED files (.mseed / .ms / .miniseed)")
     p.add_argument("--output", default="scored_picks.csv",
                    help="Output CSV file (default: scored_picks.csv)")
     return p.parse_args()
 
 
 def main():
-    args = parse_args()
-    input_dir = os.path.expanduser(args.input)
+    args   = parse_args()
+    indir  = os.path.expanduser(args.input)
 
-    if not os.path.isdir(input_dir):
-        sys.exit(f"Input folder not found: {input_dir}")
+    if not os.path.isdir(indir):
+        sys.exit(f"Input folder not found: {indir}")
 
-    # ── 1. Collect miniSEED files ─────────────────────────────────────────────
-    mseed_files = sorted(
-        os.path.join(input_dir, f) for f in os.listdir(input_dir)
+    files = sorted(
+        os.path.join(indir, f) for f in os.listdir(indir)
         if f.lower().endswith((".mseed", ".ms", ".miniseed"))
     )
-    if not mseed_files:
-        sys.exit(f"No miniSEED files found in {input_dir}")
+    if not files:
+        sys.exit(f"No miniSEED files found in {indir}")
 
-    print(f"[1/5] Found {len(mseed_files)} miniSEED file(s) in {input_dir}")
+    # ── 1. Load model ─────────────────────────────────────────────────────────
+    print(f"[1/4] Loading RecovAR model...")
+    scorer = RecovARScorer(MODEL_PATH)
+    print( "      Model ready")
 
-    # ── 2. Concatenate into a single playback file ────────────────────────────
+    # ── 2. Concatenate files for scautopick ───────────────────────────────────
+    print(f"[2/4] Found {len(files)} miniSEED file(s) — running scautopick...")
     tmp = tempfile.NamedTemporaryFile(suffix=".mseed", delete=False)
     tmp.close()
-    playback = tmp.name
-
-    print(f"[2/5] Concatenating into {playback} ...")
-    with open(playback, "wb") as out:
-        for path in mseed_files:
+    with open(tmp.name, "wb") as out:
+        for path in files:
             with open(path, "rb") as f:
                 out.write(f.read())
 
-    record_url = f"file://{playback}"
-
-    # ── 3. Point recovar at the playback file and restart ────────────────────
-    print(f"[3/5] Updating recovar config → {record_url}")
-    original_stream = None
-    with open(CFG_FILE) as f:
-        for line in f:
-            if line.strip().startswith("recordStream"):
-                original_stream = line.strip()
-                break
-
-    update_record_stream(record_url)
-    seiscomp("stop recovar_pick_filter")
-    time.sleep(1)
-    seiscomp("start recovar_pick_filter")
-
-    print("       Waiting for model to load (~30 s) ...")
-    if not wait_for_ready(timeout=90):
-        sys.exit("recovar_pick_filter did not reach ready state. "
-                 f"Check {LOG_FILE}")
-    print("       recovar_pick_filter: ready")
-
-    # ── 4. Run scautopick ─────────────────────────────────────────────────────
-    log_offset = os.path.getsize(LOG_FILE) if os.path.exists(LOG_FILE) else 0
-
-    print(f"[4/5] Running scautopick on {playback} ...")
-    result = run(
-        f"seiscomp exec scautopick --playback -I {record_url} -d {DB_URL}"
+    result = subprocess.run(
+        f"seiscomp exec scautopick --ep --playback -I file://{tmp.name} -d {DB_URL}",
+        shell=True, capture_output=True, text=True,
     )
-    if result.returncode not in (0, 1):
-        print(f"       scautopick exited with code {result.returncode}")
+    os.unlink(tmp.name)
 
-    # Count how many picks scautopick emitted from its output
-    n_emitted = result.stderr.count("emit detection") + \
-                result.stdout.count("emit detection")
+    picks = parse_picks(result.stdout)
+    print(f"      {len(picks)} pick(s) detected")
+    if not picks:
+        print("      Nothing to score.")
+        return
 
-    # Wait for recovar to score them (up to 60 s)
-    n_scored = wait_for_scores(max(n_emitted, 1), timeout=60)
-    print(f"       scautopick emitted picks, recovar scored {n_scored}")
+    # ── 3. Load waveforms ─────────────────────────────────────────────────────
+    print(f"[3/4] Loading waveforms...")
+    stream = Stream()
+    for path in files:
+        stream += read(path)
+    stream.merge(method=1, fill_value=0)
 
-    # ── 5. Export CSV ─────────────────────────────────────────────────────────
-    print(f"[5/5] Exporting results to {args.output} ...")
-    n_rows = export_csv(args.output)
-    print(f"       {n_rows} scored pick(s) written to {args.output}")
+    # ── 4. Score each pick ────────────────────────────────────────────────────
+    print(f"[4/4] Scoring {len(picks)} pick(s)...")
+    rows = []
+    for pick in picks:
+        waveform = extract_waveform(stream, pick)
+        if waveform is None:
+            print(f"      SKIP {pick['id']} — waveform unavailable")
+            continue
+        score = scorer.score(waveform)
+        rows.append((pick["id"], str(pick["time"]),
+                     pick["net"], pick["sta"], pick["loc"], pick["cha"],
+                     f"{score:.4f}"))
+        print(f"      {pick['net']}.{pick['sta']}.{pick['loc']}.{pick['cha']}"
+              f"  {pick['time']}  score={score:.4f}")
 
-    # ── Cleanup ───────────────────────────────────────────────────────────────
-    os.unlink(playback)
-    if original_stream:
-        with open(CFG_FILE) as f:
-            content = f.read()
-        content = re.sub(r"(?m)^recordStream\s*=.*$", original_stream, content)
-        with open(CFG_FILE, "w") as f:
-            f.write(content)
-        seiscomp("stop recovar_pick_filter")
-        time.sleep(1)
-        seiscomp("start recovar_pick_filter")
+    with open(args.output, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["pick_id", "pick_time", "net", "sta", "loc", "cha", "score"])
+        w.writerows(rows)
 
-    print("\nDone.")
+    print(f"\nDone. {len(rows)} scored pick(s) → {args.output}")
 
 
 if __name__ == "__main__":
