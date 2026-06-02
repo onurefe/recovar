@@ -54,7 +54,7 @@ class RecovARPickFilter(seiscomp.client.Application):
     def __init__(self, argc, argv):
         super().__init__(argc, argv)
         self.setMessagingEnabled(True)
-        self.setDatabaseEnabled(True, True)
+        self.setDatabaseEnabled(False, False)
         self.setPrimaryMessagingGroup("PICK")
         self.addMessagingSubscription("PICK")
 
@@ -110,14 +110,14 @@ class RecovARPickFilter(seiscomp.client.Application):
             )
             return False
 
-        seiscomp.logging.info(f"recovar: loading model from {self._model_path}")
+        seiscomp.logging.notice(f"recovar: loading model from {self._model_path}")
         try:
             self._scorer = RecovARScorer(self._model_path)
         except Exception as exc:
             seiscomp.logging.error(f"recovar: failed to load model — {exc}")
             return False
 
-        seiscomp.logging.info("recovar_pick_filter: ready")
+        seiscomp.logging.notice("recovar_pick_filter: ready")
         return True
 
     # ------------------------------------------------------------------
@@ -158,7 +158,7 @@ class RecovARPickFilter(seiscomp.client.Application):
                 return
 
             score = self._scorer.score(waveform)
-            seiscomp.logging.info(
+            seiscomp.logging.notice(
                 f"recovar: {pick.publicID()} {COMMENT_KEY}={score:.4f}"
             )
             self._attach_comment(pick, score)
