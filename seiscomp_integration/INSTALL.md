@@ -60,36 +60,7 @@ bash ~/recovar/seiscomp_integration/install.sh
 ```
 
 The installer creates the Python venv at `~/recovar-seiscomp`, installs
-dependencies (tensorflow, obspy, scipy, numpy), and copies `recovar_playback`
-and `recovar_batch_test` into `$SEISCOMP_ROOT/bin/`.
+dependencies (tensorflow, obspy, scipy, numpy), and installs the
+`recovar_pick_filter` daemon into `$SEISCOMP_ROOT/bin/`.
 
 It will print `All imports OK` at the end if everything succeeded.
-
----
-
-## Verifying the installation
-
-**All Python imports work:**
-```bash
-~/recovar-seiscomp/bin/python3 -c "
-import seiscomp.client, seiscomp.datamodel, seiscomp.io
-import tensorflow, recovar, recovar_scorer
-print('All imports OK — tensorflow', tensorflow.__version__)
-"
-```
-Expected: `All imports OK — tensorflow 2.14.0`
-
-**Batch scoring validation** (requires internet — downloads waveforms from IRIS):
-```bash
-seiscomp exec recovar_batch_test
-```
-Expected: earthquakes score higher than noise on average.
-
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `All imports` check fails | Check that PYTHONPATH in `~/.bashrc` has correct paths and has been sourced |
-| `No plugins loaded` | Ensure `core.plugins = dbmysql` is in `~/.seiscomp/global.cfg` |

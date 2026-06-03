@@ -4,7 +4,7 @@
 # What this script does:
 #   1. Installs system packages (requires sudo)
 #   2. Creates the Python venv and installs dependencies
-#   3. Installs the recovar_pick_filter daemon and recovar_batch_test into SeisComP
+#   3. Installs the recovar_pick_filter daemon into SeisComP
 #
 # Prerequisites (done manually beforehand):
 #   - SeisComP installed and set up (seiscomp setup)
@@ -47,13 +47,6 @@ echo "      recovar_pick_filter installed"
 cp "$REPO/seiscomp_integration/recovar_pick_filter.py.init" "$SEISCOMP_ROOT/etc/init/recovar_pick_filter.py"
 seiscomp enable recovar_pick_filter
 echo "      recovar_pick_filter enabled as SeisComP daemon"
-
-
-
-cp "$REPO/seiscomp_integration/batch_score_test.py" "$SEISCOMP_ROOT/bin/recovar_batch_test"
-sed -i "1s|.*|#!$VENV/bin/python3|" "$SEISCOMP_ROOT/bin/recovar_batch_test"
-chmod +x "$SEISCOMP_ROOT/bin/recovar_batch_test"
-echo "      recovar_batch_test installed"
 
 # ── Update ~/.bashrc ──────────────────────────────────────────────────────────
 MARKER="# SeisComP + RECOVAR environment"
