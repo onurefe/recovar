@@ -38,9 +38,15 @@ from recovar_scorer import RecovARScorer  # noqa: E402  (local import after path
 # Constants
 # ---------------------------------------------------------------------------
 
-WINDOW_BEFORE_S = 5.0    # seconds before pick time
-WINDOW_AFTER_S  = 25.0   # seconds after pick time  →  total 30 s = 3000 @ 100 Hz
+FETCH_BEFORE_S  = 20.0   # fetch window before pick (provides filter edge buffer)
+FETCH_AFTER_S   = 20.0   # fetch window after pick
+CROP_BEFORE_S   = 15.0   # crop window before pick passed to RecovAR
+CROP_AFTER_S    = 15.0   # crop window after pick passed to RecovAR
 TARGET_FS       = 100    # Hz required by recovar
+
+BP_LOW_HZ       = 1.0    # bandpass low corner (Hz)
+BP_HIGH_HZ      = 20.0   # bandpass high corner (Hz)
+BP_CORNERS      = 4      # Butterworth filter order
 
 COMMENT_KEY = "recovar_score"
 
@@ -181,16 +187,24 @@ class RecovARPickFilter(seiscomp.client.Application):
         pick_time,
     ) -> np.ndarray | None:
         """
-        Fetch a 30-second, 3-component window around *pick_time*.
+        Fetch a 40-second window centered on *pick_time*, apply a zero-phase
+        1–20 Hz bandpass in the Fourier domain, then crop the inner 30 seconds
+        (also centered on the pick) for RecovAR.
 
-        Returns a float32 array of shape (3000, 3) with channels ordered
-        [Z, N/1, E/2], or None if the data cannot be retrieved.
+        Returns a float32 array of shape (3000, 3) ordered [Z, N/1, E/2],
+        or None if the data cannot be retrieved.
         """
-        t_start = pick_time + seiscomp.core.TimeSpan(-WINDOW_BEFORE_S)
-        t_end   = pick_time + seiscomp.core.TimeSpan(WINDOW_AFTER_S)
-        n_want  = int((WINDOW_BEFORE_S + WINDOW_AFTER_S) * TARGET_FS)  # 3000
+        t_start  = pick_time + seiscomp.core.TimeSpan(-FETCH_BEFORE_S)
+        t_end    = pick_time + seiscomp.core.TimeSpan(FETCH_AFTER_S)
+        n_fetch  = int((FETCH_BEFORE_S + FETCH_AFTER_S) * TARGET_FS)   # 4000
+        n_output = int((CROP_BEFORE_S  + CROP_AFTER_S)  * TARGET_FS)   # 3000
 
-        band = cha[:2]  # e.g. "HH" from "HHZ"
+        # Crop indices: pick sits at sample FETCH_BEFORE_S * TARGET_FS = 2000
+        pick_sample  = int(FETCH_BEFORE_S * TARGET_FS)
+        crop_start   = pick_sample - int(CROP_BEFORE_S * TARGET_FS)    # 500
+        crop_end     = crop_start + n_output                            # 3500
+
+        band = cha[:2]
 
         raw = self._stream_components(net, sta, loc, band, t_start, t_end)
         if not raw:
@@ -209,8 +223,14 @@ class RecovARPickFilter(seiscomp.client.Application):
             )
             return None
 
-        channels = [self._fit(arr, n_want) for arr in (z, h1, h2)]
-        return np.stack(channels, axis=-1).astype(np.float32)  # (3000, 3)
+        channels = []
+        for arr in (z, h1, h2):
+            arr = self._fit(arr, n_fetch)        # pad/trim to 4000 samples
+            arr = _bandpass(arr, TARGET_FS)      # zero-phase Fourier bandpass
+            arr = arr[crop_start:crop_end]       # crop to 3000 centered samples
+            channels.append(arr)
+
+        return np.stack(channels, axis=-1).astype(np.float32)
 
     def _stream_components(self, net, sta, loc, band, t_start, t_end):
         """
@@ -302,6 +322,21 @@ def _resample(arr: np.ndarray, src_fs: float, dst_fs: int) -> np.ndarray:
     from scipy.signal import resample as sp_resample
     n_out = int(round(len(arr) * dst_fs / src_fs))
     return sp_resample(arr, n_out)
+
+
+def _bandpass(arr: np.ndarray, fs: float) -> np.ndarray:
+    """Zero-phase bandpass filter applied in the Fourier domain.
+
+    Multiplies the one-sided FFT by |H(f)|², where H is a Butterworth
+    bandpass of order BP_CORNERS.  Squaring the magnitude gives zero phase
+    shift while doubling the roll-off steepness (equivalent to filtfilt).
+    """
+    from scipy.signal import butter, freqz
+    n      = len(arr)
+    freqs  = np.fft.rfftfreq(n, d=1.0 / fs)
+    b, a   = butter(BP_CORNERS, [BP_LOW_HZ, BP_HIGH_HZ], btype="band", fs=fs)
+    _, h   = freqz(b, a, worN=freqs, fs=fs)
+    return np.fft.irfft(np.fft.rfft(arr) * np.abs(h) ** 2, n=n)
 
 
 # ---------------------------------------------------------------------------
