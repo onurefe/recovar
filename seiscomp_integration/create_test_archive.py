@@ -17,6 +17,7 @@ import sys
 import warnings
 warnings.filterwarnings("ignore")
 
+import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.clients.fdsn import Client
 from obspy.geodetics import locations2degrees
@@ -51,6 +52,34 @@ WINDOW_BEFORE = 30.0   # s before P arrival (extra buffer for scautopick)
 WINDOW_AFTER  = 120.0  # s after  P arrival
 
 
+def pad_to_day(tr):
+    """Pad a trace with zeros to cover its full calendar day (midnight-to-midnight).
+
+    Full-day coverage is required so SeisComP's sdsarchive record stream
+    can serve the file without reporting an invalid time window.
+
+    We build the padded array manually rather than using obspy trim so that
+    starttime is set to exactly UTC midnight.  obspy's trim(nearest_sample=True)
+    snaps to the nearest sample on the existing grid, which often lands one
+    sample before midnight and shifts data into the previous calendar day.
+    """
+    t   = tr.stats.starttime
+    fs  = tr.stats.sampling_rate
+    day_start = UTCDateTime(t.year, t.month, t.day)
+    n_pre     = int(round((t - day_start) * fs))
+    n_day     = int(round(86400 * fs))
+    n_post    = max(0, n_day - n_pre - len(tr.data))
+
+    tr              = tr.copy()
+    tr.data         = np.concatenate([
+        np.zeros(n_pre, dtype=np.int32),
+        tr.data.astype(np.int32),
+        np.zeros(n_post, dtype=np.int32),
+    ])
+    tr.stats.starttime = day_start
+    return tr
+
+
 def sds_path(root, tr):
     """Return the SDS file path for a given trace."""
     t    = tr.stats.starttime
@@ -66,22 +95,24 @@ def sds_path(root, tr):
 
 
 def write_sds(root, st):
-    """Append all traces in *st* to their respective SDS files."""
+    """Write all traces in *st* to their SDS files, padded to full-day coverage."""
     written = set()
     for tr in st:
-        path = sds_path(root, tr)
+        path = sds_path(root, tr)   # use original starttime for correct day name
+        tr   = pad_to_day(tr)       # padding shifts starttime to 23:59:59 of prev day
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        # Append to existing day file if present, otherwise create.
         if os.path.exists(path):
             existing = read_mseed_safe(path)
             if existing is not None:
                 existing += tr.copy()
                 existing.merge(method=1, fill_value=0)
-                existing.write(path, format="MSEED")
+                for ex_tr in existing:
+                    ex_tr = pad_to_day(ex_tr)
+                    ex_tr.write(path, format="MSEED", reclen=512, encoding="STEIM2")
             else:
-                tr.write(path, format="MSEED")
+                tr.write(path, format="MSEED", reclen=512, encoding="STEIM2")
         else:
-            tr.write(path, format="MSEED")
+            tr.write(path, format="MSEED", reclen=512, encoding="STEIM2")
         written.add(path)
     return written
 

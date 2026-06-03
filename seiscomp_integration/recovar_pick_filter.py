@@ -16,7 +16,6 @@ Configuration (recovar_pick_filter.cfg):
 """
 
 import sys
-import os
 import numpy as np
 
 import seiscomp.client
@@ -25,30 +24,52 @@ import seiscomp.datamodel
 import seiscomp.io
 import seiscomp.logging
 
-# Add the recovar repo root to sys.path so the package is importable when the
-# module is run from outside the repo directory.
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(_HERE)
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-
-from recovar_scorer import RecovARScorer  # noqa: E402  (local import after path fixup)
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-FETCH_BEFORE_S  = 20.0   # fetch window before pick (provides filter edge buffer)
-FETCH_AFTER_S   = 20.0   # fetch window after pick
-CROP_BEFORE_S   = 15.0   # crop window before pick passed to RecovAR
-CROP_AFTER_S    = 15.0   # crop window after pick passed to RecovAR
-TARGET_FS       = 100    # Hz required by recovar
+# Waveform fetch window for the single pick score (filter edge buffer)
+FETCH_BEFORE_S  = 20.0
+FETCH_AFTER_S   = 20.0
+CROP_BEFORE_S   = 15.0   # inner 30 s passed to RecovAR
+CROP_AFTER_S    = 15.0
 
-BP_LOW_HZ       = 1.0    # bandpass low corner (Hz)
-BP_HIGH_HZ      = 20.0   # bandpass high corner (Hz)
-BP_CORNERS      = 4      # Butterworth filter order
+# Score sweep: wider fetch so every window fits; offsets relative to t_p
+SWEEP_FETCH_BEFORE_S = 60.0
+SWEEP_FETCH_AFTER_S  = 50.0
+SWEEP_OFFSETS_S      = list(range(-40, 31, 5))  # −40,−35,…,0,…,+30 (15 pts)
 
-COMMENT_KEY = "recovar_score"
+TARGET_FS   = 100    # Hz required by recovar
+BP_LOW_HZ   = 1.0
+BP_HIGH_HZ  = 20.0
+BP_CORNERS  = 4
+
+COMMENT_KEY       = "recovar_score"
+SWEEP_COMMENT_KEY = "recovar_score_sweep"
+
+
+from recovar.representation_learning_models import RepresentationLearningMultipleAutoencoder
+from recovar.classifier_models import ClassifierMultipleAutoencoder
+
+_DUMMY = np.zeros((1, 3000, 3), dtype=np.float32)
+
+
+class RecovARScorer:
+    def __init__(self, model_path: str):
+        self._model = RepresentationLearningMultipleAutoencoder(
+            name="rep_learning_autoencoder_ensemble",
+            input_noise_std=1e-6,
+            eps=1e-27,
+        )
+        self._model.compile()
+        self._model(_DUMMY)
+        self._model.load_weights(model_path)
+        self._classifier = ClassifierMultipleAutoencoder(self._model)
+
+    def score(self, waveform: np.ndarray) -> float:
+        """Score a (3000, 3) float32 waveform. Returns [0, 1]."""
+        x = waveform[np.newaxis].astype(np.float32)
+        return float(self._classifier(x)[0])
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +106,13 @@ class RecovARPickFilter(seiscomp.client.Application):
         return True
 
     def initConfiguration(self):
-        return super().initConfiguration()
+        if not super().initConfiguration():
+            return False
+        try:
+            self._record_stream_url = self.configGetString("recordStream")
+        except Exception:
+            pass
+        return True
 
     def init(self):
         if not super().init():
@@ -102,14 +129,13 @@ class RecovARPickFilter(seiscomp.client.Application):
             pass
 
         if not self._model_path:
-            seiscomp.logging.error(
-                "recovar_pick_filter: --model-path is required."
-            )
+            seiscomp.logging.error("recovar_pick_filter: --model-path is required.")
             return False
 
         if not self._record_stream_url:
             seiscomp.logging.error(
-                "recovar_pick_filter: --record-stream is required."
+                "recovar_pick_filter: --record-stream is required "
+                "(or set recordStream in global.cfg)."
             )
             return False
 
@@ -124,7 +150,7 @@ class RecovARPickFilter(seiscomp.client.Application):
         return True
 
     # ------------------------------------------------------------------
-    # Pick handling — called by the SeisComP messaging layer
+    # Pick handling
     # ------------------------------------------------------------------
 
     def addObject(self, parentID, obj):
@@ -137,26 +163,40 @@ class RecovARPickFilter(seiscomp.client.Application):
         if pick:
             self._process_pick(pick)
 
-    # ------------------------------------------------------------------
-
     def _process_pick(self, pick):
         try:
-            wid  = pick.waveformID()
-            net  = wid.networkCode()
-            sta  = wid.stationCode()
-            loc  = wid.locationCode()
-            cha  = wid.channelCode()
-            t    = pick.time().value()
+            wid = pick.waveformID()
+            net = wid.networkCode()
+            sta = wid.stationCode()
+            loc = wid.locationCode()
+            cha = wid.channelCode()
+            t   = pick.time().value()
 
             seiscomp.logging.debug(
                 f"recovar: scoring {pick.publicID()} "
                 f"[{net}.{sta}.{loc}.{cha} @ {t.iso()}]"
             )
 
-            waveform = self._fetch_waveform(net, sta, loc, cha, t)
-            if waveform is None:
+            # One wide fetch of raw (unfiltered) data for both the pick score
+            # and the sweep.  Bandpass is applied per-window inside _score_window
+            # so that signal from outside each window cannot contaminate it.
+            raw_data, pick_idx = self._fetch_waveform_raw(
+                net, sta, loc, cha, t,
+                before_s=SWEEP_FETCH_BEFORE_S,
+                after_s=SWEEP_FETCH_AFTER_S,
+                apply_bandpass=False,
+            )
+            if raw_data is None:
                 seiscomp.logging.warning(
                     f"recovar: skipping {pick.publicID()} — waveform unavailable"
+                )
+                return
+
+            # Score at t_p using independent per-window bandpass
+            waveform = self._score_window(raw_data, pick_idx, 0.0)
+            if waveform is None:
+                seiscomp.logging.warning(
+                    f"recovar: skipping {pick.publicID()} — score window at t_p failed"
                 )
                 return
 
@@ -165,6 +205,15 @@ class RecovARPickFilter(seiscomp.client.Application):
                 f"recovar: {pick.publicID()} {COMMENT_KEY}={score:.4f}"
             )
             self._attach_comment(pick, score)
+
+            # Sweep: each offset gets its own isolated 40 s → bandpass → 30 s window
+            sweep_scores = []
+            for off in SWEEP_OFFSETS_S:
+                w = self._score_window(raw_data, pick_idx, off)
+                sweep_scores.append(
+                    self._scorer.score(w) if w is not None else float("nan")
+                )
+            self._attach_sweep_comment(pick, sweep_scores)
 
         except Exception as exc:
             seiscomp.logging.error(
@@ -175,66 +224,107 @@ class RecovARPickFilter(seiscomp.client.Application):
     # Waveform retrieval
     # ------------------------------------------------------------------
 
-    def _fetch_waveform(
+    def _fetch_waveform_raw(
         self,
         net: str,
         sta: str,
         loc: str,
         cha: str,
         pick_time,
-    ) -> np.ndarray | None:
+        before_s: float = FETCH_BEFORE_S,
+        after_s: float = FETCH_AFTER_S,
+        apply_bandpass: bool = True,
+    ) -> tuple:
+        """Fetch before_s+after_s seconds, optionally bandpass, return (data, pick_idx).
+
+        data: float32 array (n_total, 3) ordered [Z, N/1, E/2].
+        pick_idx: sample index of t_p within data.
+        Returns (None, 0) on failure.
         """
-        Fetch a 40-second window centered on *pick_time*, apply a zero-phase
-        1–20 Hz bandpass in the Fourier domain, then crop the inner 30 seconds
-        (also centered on the pick) for RecovAR.
-
-        Returns a float32 array of shape (3000, 3) ordered [Z, N/1, E/2],
-        or None if the data cannot be retrieved.
-        """
-        t_start  = pick_time + seiscomp.core.TimeSpan(-FETCH_BEFORE_S)
-        t_end    = pick_time + seiscomp.core.TimeSpan(FETCH_AFTER_S)
-        n_fetch  = int((FETCH_BEFORE_S + FETCH_AFTER_S) * TARGET_FS)   # 4000
-        n_output = int((CROP_BEFORE_S  + CROP_AFTER_S)  * TARGET_FS)   # 3000
-
-        # Crop indices: pick sits at sample FETCH_BEFORE_S * TARGET_FS = 2000
-        pick_sample  = int(FETCH_BEFORE_S * TARGET_FS)
-        crop_start   = pick_sample - int(CROP_BEFORE_S * TARGET_FS)    # 500
-        crop_end     = crop_start + n_output                            # 3500
-
-        band = cha[:2]
+        t_start  = pick_time + seiscomp.core.TimeSpan(-before_s)
+        t_end    = pick_time + seiscomp.core.TimeSpan(after_s)
+        n_total  = int((before_s + after_s) * TARGET_FS)
+        pick_idx = int(before_s * TARGET_FS)
+        band     = cha[:2]
 
         raw = self._stream_components(net, sta, loc, band, t_start, t_end)
         if not raw:
-            return None
+            return None, 0
 
         z  = self._select(raw, ["Z"])
         h1 = self._select(raw, ["N", "1"])
         h2 = self._select(raw, ["E", "2"])
 
-        missing = [name for name, data in [("Z", z), ("H1", h1), ("H2", h2)]
-                   if data is None]
+        missing = [name for name, arr in [("Z", z), ("H1", h1), ("H2", h2)]
+                   if arr is None]
         if missing:
             seiscomp.logging.warning(
-                f"recovar: missing components {missing} "
-                f"for {net}.{sta}.{loc}.{band}"
+                f"recovar: missing components {missing} for {net}.{sta}.{loc}.{band}"
             )
-            return None
+            return None, 0
 
         channels = []
         for arr in (z, h1, h2):
-            arr = self._fit(arr, n_fetch)        # pad/trim to 4000 samples
-            arr = _bandpass(arr, TARGET_FS)      # zero-phase Fourier bandpass
-            arr = arr[crop_start:crop_end]       # crop to 3000 centered samples
+            arr = self._fit(arr, n_total)
+            if apply_bandpass:
+                arr = _bandpass(arr, TARGET_FS)
             channels.append(arr)
+
+        return np.stack(channels, axis=-1).astype(np.float32), pick_idx
+
+    @staticmethod
+    def _crop_window(
+        data: np.ndarray,
+        pick_idx: int,
+        offset_s: float,
+    ) -> "np.ndarray | None":
+        """Extract a 30-second RecovAR window centred at pick_idx + offset_s*FS."""
+        n_out  = int((CROP_BEFORE_S + CROP_AFTER_S) * TARGET_FS)   # 3000
+        centre = pick_idx + int(offset_s * TARGET_FS)
+        start  = centre - int(CROP_BEFORE_S * TARGET_FS)
+        end    = start + n_out
+        if start < 0 or end > len(data):
+            return None
+        return data[start:end]
+
+    @staticmethod
+    def _score_window(
+        raw_data: np.ndarray,
+        pick_idx: int,
+        offset_s: float,
+    ) -> "np.ndarray | None":
+        """Produce a (3000, 3) float32 array for scoring using per-window bandpass.
+
+        For a window centred at t_c = t_p + offset_s:
+          1. Crop a fresh 40 s window (FETCH_BEFORE_S + FETCH_AFTER_S) from raw_data
+          2. Apply 1-20 Hz bandpass to each channel of that isolated window
+          3. Crop the inner 30 s (CROP_BEFORE_S + CROP_AFTER_S)
+          4. Return (3000, 3) float32
+
+        This prevents signal from other time regions (especially the P-wave) from
+        contaminating pre-signal windows through the filter's impulse response.
+        Returns None if the window would exceed raw_data bounds.
+        """
+        n_fetch    = int((FETCH_BEFORE_S + FETCH_AFTER_S) * TARGET_FS)   # 4000
+        n_out      = int((CROP_BEFORE_S  + CROP_AFTER_S)  * TARGET_FS)   # 3000
+        crop_start = int(FETCH_BEFORE_S * TARGET_FS) - int(CROP_BEFORE_S * TARGET_FS)  # 500
+
+        centre      = pick_idx + int(offset_s * TARGET_FS)
+        fetch_start = centre - int(FETCH_BEFORE_S * TARGET_FS)
+        fetch_end   = fetch_start + n_fetch
+
+        if fetch_start < 0 or fetch_end > len(raw_data):
+            return None
+
+        channels = []
+        for ch in range(raw_data.shape[1]):
+            window = raw_data[fetch_start:fetch_end, ch]
+            window = _bandpass(window, TARGET_FS)
+            channels.append(window[crop_start:crop_start + n_out])
 
         return np.stack(channels, axis=-1).astype(np.float32)
 
     def _stream_components(self, net, sta, loc, band, t_start, t_end):
-        """
-        Open the configured RecordStream, request all components for the
-        given band+wildcard, and return a dict mapping the last channel
-        character to a resampled numpy array.
-        """
         rs = seiscomp.io.RecordStream.Open(self._record_stream_url)
         if rs is None:
             seiscomp.logging.error(
@@ -251,7 +341,7 @@ class RecovARPickFilter(seiscomp.client.Application):
             seiscomp.core.Record.SAVE_RAW,
         )
 
-        buffers: dict[str, list[np.ndarray]] = {}
+        buffers: dict[str, list] = {}
         for rec in ri:
             comp_char = rec.channelCode()[-1]
             arr = _record_to_numpy(rec)
@@ -262,7 +352,7 @@ class RecovARPickFilter(seiscomp.client.Application):
         return {c: np.concatenate(segs) for c, segs in buffers.items()}
 
     @staticmethod
-    def _select(data: dict, candidates: list[str]) -> np.ndarray | None:
+    def _select(data: dict, candidates: list) -> "np.ndarray | None":
         for c in candidates:
             if c in data:
                 return data[c]
@@ -270,23 +360,33 @@ class RecovARPickFilter(seiscomp.client.Application):
 
     @staticmethod
     def _fit(arr: np.ndarray, n: int) -> np.ndarray:
-        """Trim or zero-pad *arr* to exactly *n* samples."""
         if len(arr) >= n:
             return arr[:n]
         return np.pad(arr, (0, n - len(arr)))
 
     # ------------------------------------------------------------------
-    # Attach comment via SeisComP messaging
+    # Attach comments via SeisComP messaging
     # ------------------------------------------------------------------
 
     def _attach_comment(self, pick, score: float):
+        self._send_comment(pick, COMMENT_KEY, f"{COMMENT_KEY}:{score:.4f}")
+
+    def _attach_sweep_comment(self, pick, scores: list):
+        start_s = SWEEP_OFFSETS_S[0]
+        step_s  = SWEEP_OFFSETS_S[1] - SWEEP_OFFSETS_S[0]
+        vals    = ",".join(f"{s:.4f}" for s in scores)
+        self._send_comment(pick, SWEEP_COMMENT_KEY,
+                           f"{SWEEP_COMMENT_KEY}:{start_s}:{step_s}:{vals}")
+
+    def _send_comment(self, pick, comment_id: str, text: str):
         ci = seiscomp.datamodel.CreationInfo()
         ci.setAgencyID(self.agencyID())
         ci.setAuthor("recovar_pick_filter")
         ci.setCreationTime(seiscomp.core.Time.GMT())
 
         comment = seiscomp.datamodel.Comment()
-        comment.setText(f"{COMMENT_KEY}:{score:.4f}")
+        comment.setId(comment_id)   # unique index within the pick
+        comment.setText(text)
         comment.setCreationInfo(ci)
 
         seiscomp.datamodel.Notifier.Enable()
@@ -299,17 +399,14 @@ class RecovARPickFilter(seiscomp.client.Application):
 
 
 # ---------------------------------------------------------------------------
-# Helpers (module-level, used by _stream_components)
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _record_to_numpy(rec) -> np.ndarray:
-    """Convert a SeisComP GenericRecord to a numpy float64 array."""
     data = rec.data()
-    # Modern SeisComP (≥4.x) exposes a numpy() buffer on typed arrays.
     try:
         return np.frombuffer(data.numpy(), dtype=np.float64).copy()
     except (AttributeError, TypeError):
-        # Fallback: iterate element by element (slower but universally safe).
         return np.array([data.get(i) for i in range(data.size())], dtype=np.float64)
 
 
@@ -322,17 +419,12 @@ def _resample(arr: np.ndarray, src_fs: float, dst_fs: int) -> np.ndarray:
 
 
 def _bandpass(arr: np.ndarray, fs: float) -> np.ndarray:
-    """Zero-phase bandpass filter applied in the Fourier domain.
-
-    Multiplies the one-sided FFT by |H(f)|², where H is a Butterworth
-    bandpass of order BP_CORNERS.  Squaring the magnitude gives zero phase
-    shift while doubling the roll-off steepness (equivalent to filtfilt).
-    """
+    """Zero-phase Fourier-domain Butterworth bandpass (equivalent to filtfilt)."""
     from scipy.signal import butter, freqz
-    n      = len(arr)
-    freqs  = np.fft.rfftfreq(n, d=1.0 / fs)
-    b, a   = butter(BP_CORNERS, [BP_LOW_HZ, BP_HIGH_HZ], btype="band", fs=fs)
-    _, h   = freqz(b, a, worN=freqs, fs=fs)
+    n     = len(arr)
+    freqs = np.fft.rfftfreq(n, d=1.0 / fs)
+    b, a  = butter(BP_CORNERS, [BP_LOW_HZ, BP_HIGH_HZ], btype="band", fs=fs)
+    _, h  = freqz(b, a, worN=freqs, fs=fs)
     return np.fft.irfft(np.fft.rfft(arr) * np.abs(h) ** 2, n=n)
 
 
