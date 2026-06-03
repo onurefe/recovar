@@ -101,7 +101,6 @@ def fetch_waveform(sds_root, net, sta, loc, cha_prefix, pick_time_utc):
     import numpy as np
     from obspy import UTCDateTime
     from obspy.clients.filesystem.sds import Client as SDSClient
-    from scipy.signal import butter, sosfiltfilt
 
     t0 = UTCDateTime(str(pick_time_utc))
     try:
@@ -112,9 +111,11 @@ def fetch_waveform(sds_root, net, sta, loc, cha_prefix, pick_time_utc):
             return None, None
         tr = st.merge(fill_value=0)[0]
         tr.detrend("demean")
-        fs  = tr.stats.sampling_rate
-        sos = butter(4, [1.0, 20.0], btype="band", fs=fs, output="sos")
-        data  = sosfiltfilt(sos, tr.data.astype(float))
+        fs    = tr.stats.sampling_rate
+        arr   = tr.data.astype(float)
+        freqs = np.fft.rfftfreq(len(arr), d=1.0 / fs)
+        mask  = (freqs >= 1.0) & (freqs <= 20.0)
+        data  = np.fft.irfft(np.fft.rfft(arr) * mask, n=len(arr))
         times = tr.times() - PLOT_BEFORE_S
         return times, data
     except Exception:
