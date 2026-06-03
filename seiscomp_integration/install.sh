@@ -48,17 +48,6 @@ cp "$REPO/seiscomp_integration/recovar_pick_filter.py.init" "$SEISCOMP_ROOT/etc/
 seiscomp enable recovar_pick_filter
 echo "      recovar_pick_filter enabled as SeisComP daemon"
 
-if [ ! -f "$SEISCOMP_ROOT/etc/recovar_pick_filter.cfg" ]; then
-    cat > "$SEISCOMP_ROOT/etc/recovar_pick_filter.cfg" << EOF
-recovar.modelPath = $REPO/models/representation_cross_covariances.h5
-recordStream      = slink://localhost:18000
-messaging.hostname = localhost
-agencyID = TEST
-EOF
-    echo "      wrote $SEISCOMP_ROOT/etc/recovar_pick_filter.cfg"
-else
-    echo "      $SEISCOMP_ROOT/etc/recovar_pick_filter.cfg already exists, skipped"
-fi
 
 
 cp "$REPO/seiscomp_integration/batch_score_test.py" "$SEISCOMP_ROOT/bin/recovar_batch_test"

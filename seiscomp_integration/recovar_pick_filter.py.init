@@ -5,15 +5,21 @@ import seiscomp.kernel
 class Module(seiscomp.kernel.Module):
     def __init__(self, env):
         seiscomp.kernel.Module.__init__(self, env, env.moduleName(__file__))
-        # Start after standard modules (scautopick = 100)
         self.order = 200
 
+    def _get_start_params(self):
+        repo          = os.path.expanduser("~/recovar")
+        model_path    = os.path.join(repo, "models", "representation_cross_covariances.h5")
+        record_stream = "slink://localhost:18000"
+
+        params  = seiscomp.kernel.Module._get_start_params(self)
+        params += f" --model-path {model_path}"
+        params += f" --record-stream {record_stream}"
+        return params
+
     def _run(self):
-        # Inject the recovar repo paths into PYTHONPATH so that
-        # 'recovar' and 'recovar_scorer' are importable when SeisComP
-        # launches the binary (the kernel only adds SEISCOMP_ROOT/lib/python).
-        repo = os.path.expanduser("~/recovar")
-        extra = repo + ":" + os.path.join(repo, "seiscomp_integration")
+        repo    = os.path.expanduser("~/recovar")
+        extra   = repo + ":" + os.path.join(repo, "seiscomp_integration")
         current = os.environ.get("PYTHONPATH", "")
         if extra not in current:
             os.environ["PYTHONPATH"] = extra + (":" + current if current else "")

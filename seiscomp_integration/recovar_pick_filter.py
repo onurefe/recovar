@@ -78,41 +78,38 @@ class RecovARPickFilter(seiscomp.client.Application):
             "RecovAR", "model-path,m",
             "Path to the recovar model weights (.h5)",
         )
+        self.commandline().addStringOption(
+            "RecovAR", "record-stream,I",
+            "RecordStream URL (e.g. slink://localhost:18000)",
+        )
         return True
 
     def initConfiguration(self):
-        if not super().initConfiguration():
-            return False
-        try:
-            self._model_path = self.configGetString("recovar.modelPath")
-        except Exception:
-            pass
-        try:
-            self._record_stream_url = self.configGetString("recordStream")
-        except Exception:
-            pass
-        return True
+        return super().initConfiguration()
 
     def init(self):
         if not super().init():
             return False
 
-        # Command-line flag overrides the config file value.
         try:
             self._model_path = self.commandline().optionString("model-path")
         except Exception:
             pass
 
+        try:
+            self._record_stream_url = self.commandline().optionString("record-stream")
+        except Exception:
+            pass
+
         if not self._model_path:
             seiscomp.logging.error(
-                "recovar_pick_filter: no model path set. "
-                "Use --model-path or set recovar.modelPath in the config."
+                "recovar_pick_filter: --model-path is required."
             )
             return False
 
         if not self._record_stream_url:
             seiscomp.logging.error(
-                "recovar_pick_filter: recordStream not configured."
+                "recovar_pick_filter: --record-stream is required."
             )
             return False
 
