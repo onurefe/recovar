@@ -42,7 +42,6 @@ SWEEP_OFFSETS_S      = list(range(-40, 31, 5))  # −40,−35,…,0,…,+30 (15 
 TARGET_FS   = 100    # Hz required by recovar
 BP_LOW_HZ   = 1.0
 BP_HIGH_HZ  = 20.0
-BP_CORNERS  = 4
 
 COMMENT_KEY       = "recovar_score"
 SWEEP_COMMENT_KEY = "recovar_score_sweep"
@@ -419,13 +418,11 @@ def _resample(arr: np.ndarray, src_fs: float, dst_fs: int) -> np.ndarray:
 
 
 def _bandpass(arr: np.ndarray, fs: float) -> np.ndarray:
-    """Zero-phase Fourier-domain Butterworth bandpass (equivalent to filtfilt)."""
-    from scipy.signal import butter, freqz
+    """Ideal bandpass via rectangular Fourier-domain mask (1–20 Hz)."""
     n     = len(arr)
     freqs = np.fft.rfftfreq(n, d=1.0 / fs)
-    b, a  = butter(BP_CORNERS, [BP_LOW_HZ, BP_HIGH_HZ], btype="band", fs=fs)
-    _, h  = freqz(b, a, worN=freqs, fs=fs)
-    return np.fft.irfft(np.fft.rfft(arr) * np.abs(h) ** 2, n=n)
+    mask  = (freqs >= BP_LOW_HZ) & (freqs <= BP_HIGH_HZ)
+    return np.fft.irfft(np.fft.rfft(arr) * mask, n=n)
 
 
 # ---------------------------------------------------------------------------
