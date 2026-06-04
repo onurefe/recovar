@@ -4,157 +4,197 @@
 
 ## Overview
 
-**RECOVAR** is an unsupervised machine learning framework for detecting seismic signals from continuous waveform data. By leveraging representation learning through deep auto-encoders, this method aims to effectively distinguish between seismic signals and noise without supervision, offering competitive performances to many state-of-the-art supervised methods in cross-dataset scenarios.
+**RECOVAR** is an unsupervised machine learning framework for detecting seismic signals from continuous waveform data. It uses representation learning through deep autoencoders to distinguish seismic signals from noise without supervision, achieving competitive performance against state-of-the-art supervised methods in cross-dataset scenarios.
 
-## Features
-- **Unsupervised Learning**: Utilizes deep auto-encoders to learn compressed representations of seismic waveforms, requiring raw waveforms.
-- **Robust Performance**: Demonstrates superior detection capabilities compared to existing supervised methods, with strong cross-dataset generalization.
-- **Scalability**: Designed to handle large-scale time-series data, making it applicable to various signal detection tasks beyond seismology.
-- **Intuitive Design**: Employs a time-axis-preserving approach and a straightforward triggering mechanism to differentiate noise from signals.
+---
 
 ## Table of Contents
 
-- [Recovar:](#recovar)
-  - [Table of Contents](#table-of-contents)
-  - [Installation](#installation)
-    - [Prerequisites](#prerequisites)
-    - [Using conda (Without GPU)](#using-conda-without-gpu)
-    - [Using conda (With GPU)](#using-conda-with-gpu)
-    - [Direct installation (Without GPU)](#direct-installation-without-gpu)
-    - [Direct installation (With GPU)](#direct-installation-with-gpu)
-  - [Reproducing the Results](#reproducing-the-results)
-   - [Training the models](#training-the-models)
-   - [Testing the models](#testing-the-models)
-  - [Experimenting with Custom Data](#experimenting-with-custom-data)
-  - [License](#license)
-  - [Contact](#contact)
+- [Installation](#installation)
+- [Model Training and Testing](#model-training-and-testing)
+- [SeisComP Integration](#seiscomp-integration)
+- [Reproducing the Results](#reproducing-the-results)
+- [License](#license)
+- [Contact](#contact)
 
 ---
 
 ## Installation
 
-### Prerequisites
+**Requirements:** Python 3.10, `numpy<2.0`
 
-- **Python Version:** Ensure you are using **Python 3.10**.
-- **NVIDIA GPU Drivers (If using GPU):** Required for GPU support.
-- **CUDA and cuDNN Libraries (If using GPU):** Compatible versions for TensorFlow 2.14.0.
+### Without GPU
 
-### Using conda (Without GPU)
-- **Create and activate conda environment**
-   ```bash
-   conda create -n <environment_name> python=3.10
-   conda activate <environment_name>
-   ```
-- **Install package SeismicPurifier**
-   ```bash
-   git clone git@github.com:onurefe/SeismicPurifier.git
-   cd SeismicPurifier
-   python setup.py install
-   ```
+```bash
+conda create -n recovar python=3.10
+conda activate recovar
+git clone git@github.com:onurefe/recovar.git
+cd recovar
+pip install -e .
+```
 
-### Using conda (With GPU)
-- **Create and activate conda environment**
-   ```bash
-   conda create -n <environment_name> python=3.10
-   conda activate <environment_name>
-   ```
+### With GPU (CUDA)
 
-- **Install tensorflow and cuda/cudnn libraries**
-   ```bash
-   pip install tensorflow[and-cuda]==2.14
-   ```
+```bash
+conda create -n recovar python=3.10
+conda activate recovar
+pip install tensorflow[and-cuda]==2.14
+git clone git@github.com:onurefe/recovar.git
+cd recovar
+pip install -e .
+```
 
-- **Install package SeismicPurifier**
-   ```bash
-   git clone git@github.com:onurefe/SeismicPurifier.git
-   cd SeismicPurifier
-   python setup.py install
-   ```
+> **Note:** `numpy<2.0` is pinned in `setup.py`. Some packages can pull in numpy 2.x if installed separately before recovar — always install recovar first or pin numpy explicitly.
 
-### Direct installation (Without GPU)
-- **Install package SeismicPurifier**
-   ```bash
-   git clone git@github.com:onurefe/SeismicPurifier.git
-   cd SeismicPurifier
-   python setup.py install
-   ```
+---
 
-### Direct installation (With GPU)
-- **Install tensorflow and cuda/cudnn libraries**
-   ```bash
-   pip install tensorflow[and-cuda]==2.14
+## Model Training and Testing
+
+The root-level notebooks `model_train.ipynb` and `model_test.ipynb` provide the quickest way to train and evaluate RECOVAR on your own data. Sample data (1280 waveforms, shape `(N, 3000, 3)`) is provided in `data/` and pre-trained weights are in `models/`.
+
+### Data format
+
+Input waveforms are numpy arrays of shape `(N, 3000, 3)` — N samples, 3000 time steps at 100 Hz (30 s), 3 components. Labels are 1-D arrays of shape `(N,)` with `1` for earthquake and `0` for noise.
+
+### Training — `model_train.ipynb`
+
+1. Set paths and parameters in the Configuration cell:
+
+   ```python
+   TRAIN_DATA_PATH = 'data/X_train_1280sample.npy'
+   TEST_DATA_PATH  = 'data/X_test_1280sample.npy'
+   TRAIN_LABEL_PATH = 'data/Y_train_1280sample.npy'
+   TEST_LABEL_PATH  = 'data/Y_test_1280sample.npy'
+   MODEL_SAVE_PATH  = 'checkpoints/representation_cross_covariances.h5'
+   EPOCHS = 50
+   LEARNING_RATE = 1e-3
    ```
 
-- **Install package SeismicPurifier**
-   ```bash
-   git clone git@github.com:onurefe/SeismicPurifier.git
-   cd SeismicPurifier
-   python setup.py install
-   ```
+2. Choose a representation learning model (default: `RepresentationLearningMultipleAutoencoder`):
+
+   | Model | Notes |
+   |---|---|
+   | `RepresentationLearningSingleAutoencoder` | Single-channel autoencoder |
+   | `RepresentationLearningDenoisingSingleAutoencoder` | Denoising variant; set `input_noise_std` and `denoising_noise_std` |
+   | `RepresentationLearningMultipleAutoencoder` | Multi-channel autoencoder (recommended) |
+
+3. Run all cells. The model trains unsupervised on `X_train` (labels are not used during training). Checkpoints are saved each epoch; early stopping on validation loss is enabled.
+
+### Testing — `model_test.ipynb`
+
+1. Set `TEST_DATA_PATH`, `TEST_LABEL_PATH`, and `MODEL_PATH` (defaults point to `data/` and `models/representation_cross_covariances.h5`).
+
+2. Choose the matching classifier wrapper:
+
+   | Representation model | Classifier wrapper |
+   |---|---|
+   | `RepresentationLearningSingleAutoencoder` | `ClassifierAutocovariance` or `ClassifierAugmentedAutoencoder` |
+   | `RepresentationLearningDenoisingSingleAutoencoder` | `ClassifierAutocovariance` or `ClassifierAugmentedAutoencoder` |
+   | `RepresentationLearningMultipleAutoencoder` | `ClassifierMultipleAutoencoder` |
+
+3. Run all cells. The notebook outputs per-sample earthquake probabilities and plots the ROC curve with AUC.
+
+---
+
+### MiniSEED predictor — `mseed_predictor.py`
+
+Score a continuous 3-component MiniSEED file without SeisComP. The script slides a window across the file and outputs an earthquake probability for each position.
+
+**Pipeline per window:**
+1. Fetch a 40-second window from each component (ZNE or Z12)
+2. Drop the window if any component contains a gap
+3. Resample to 100 Hz if required
+4. Apply a 1–20 Hz ideal Fourier bandpass
+5. Crop the inner 30 seconds (removing the 5-second filter-edge buffers)
+6. Score with the RECOVAR classifier
+
+```bash
+# Print scores to stdout
+python mseed_predictor.py \
+    --input  waveforms.mseed \
+    --model  models/representation_cross_covariances.h5 \
+    --step   10
+
+# Save to CSV
+python mseed_predictor.py \
+    --input  waveforms.mseed \
+    --model  models/representation_cross_covariances.h5 \
+    --step   10 \
+    --output scores.csv
+```
+
+| Argument | Default | Description |
+|---|---|---|
+| `--input` / `-i` | required | MiniSEED file path |
+| `--model` / `-m` | required | Model weights (`.h5`) |
+| `--step` / `-s` | `10` s | Step between successive windows |
+| `--output` / `-o` | stdout | CSV output path |
+
+Output columns: `window_start` (40 s fetch window), `inner_start` (start of the scored 30 s window, = `window_start + 5 s`), `score`.
+
+---
+
+## SeisComP Integration
+
+`seiscomp_integration/` contains a SeisComP daemon (`recovar_pick_filter`) that listens on the PICK messaging group, fetches waveforms for each incoming pick, and attaches a `recovar_score:[0–1]` comment to the pick object in the database. A score sweep at ±40 s offsets (5 s steps) is also stored as `recovar_score_sweep`.
+
+Tested on **Ubuntu 22.04 + SeisComP 7.x**.
+
+- **Installation:** [`seiscomp_integration/INSTALL.md`](seiscomp_integration/INSTALL.md)
+- **Running & testing:** [`seiscomp_integration/RUN.md`](seiscomp_integration/RUN.md)
+
+### Quick summary
+
+```bash
+# Start the daemon
+seiscomp start scmaster scdb recovar_pick_filter
+
+# Query and visualise scored picks
+python3 seiscomp_integration/query_scored_picks.py
+python3 seiscomp_integration/query_scored_picks.py -o picks.csv
+python3 seiscomp_integration/query_scored_picks.py --plot --plot-output fig.png
+```
+
+---
 
 ## Reproducing the Results
-### Downloading dataset
-In order to reproduce the results given in the paper, first you need to download stead and instance datasets. Visit [STEAD](https://github.com/smousavi05/STEAD) and [INSTANCE](http://repo.pi.ingv.it/instance) for downloading instructions.
 
-### Adjusting paths, and settings
-After downloading the dataset, we need to configure **settings.json** file in the SeismicPurifier/reproducibility folder. 
-This file provides path variables and there are multiple experimentation options which you may consider adjusting for different purposes. 
+### 1. Download datasets
 
-#### Configurable parameters
-For reproducing the current results, keep these values as they are.
-   - **CONFIG**
-      - **SUBSAMPLING_FACTOR**: Default value 1.0. Change this factor if you want to use less data for training, testing and validation.
+Download [STEAD](https://github.com/smousavi05/STEAD) and [INSTANCE](http://repo.pi.ingv.it/instance) and note their local paths.
 
-      - **TRAIN_VALIDATION_SPLIT**: Default value 0.75. The ratio of training set size to the validation set size.
+### 2. Configure paths
 
-      - **KFOLD_SPLITS**: Default value 5. Dataset is split into equal parts for obtaining statistics about the performance of the model. This parameter controls the number of splits.
+Edit `reproducibility/config.py` and set:
 
-      - **DATASET_CHUNKS**: Default value 20. We split the dataset into chunk of smaller portions before using kfold validation which boosts the training performance.
+- `STEAD_WAVEFORMS_HDF5_PATH` / `STEAD_METADATA_CSV_PATH`
+- `INSTANCE_EQ_WAVEFORMS_HDF5_PATH` / `INSTANCE_EQ_METADATA_CSV_PATH`
+- `INSTANCE_NOISE_WAVEFORMS_HDF5_PATH` / `INSTANCE_NOISE_METADATA_CSV_PATH`
+- `PREPROCESSED_DATASET_DIRECTORY`, `TRAINED_MODELS_DIR`, `RESULTS_DIR`
 
-      - **PHASE_PICK_ENSURED_CROP_RATIO**: Default value 0.666666. During the training period, if the dataset window size is longer than 30s, we crop the waveform randomly. However, this crop may or may not include the P arrival event. This ratio narrows down the selection of crop window positions such that phase arrival event is ensured to be included for %66(for the default value) of the waveform samples.
+Key parameters (defaults reproduce the paper):
 
-      - **PHASE_ENSURING_MARGIN**: Marging of the definition of including the P arrival event. 
+| Parameter | Default | Description |
+|---|---|---|
+| `SUBSAMPLING_FACTOR` | `1.0` | Fraction of data to use |
+| `TRAIN_VALIDATION_SPLIT` | `0.75` | Train / validation ratio |
+| `KFOLD_SPLITS` | `5` | Number of k-fold splits |
+| `DATASET_CHUNKS` | `20` | Chunks for k-fold preprocessing |
 
-#### Directories
-Adjust paths of the datasets after downloading them to your system.
-   - **DATASET_DIRECTORIES**
-      - **STEAD_WAVEFORMS_HDF5_PATH**: Path to the STEAD dataset's waveforms stored in HDF5 format. Ensure this path points to the correct location of your STEAD waveforms file.
+### 3. Train
 
-      - **STEAD_METADATA_CSV_PATH**: Path to the STEAD dataset's metadata stored in CSV format. This file contains essential metadata associated with the STEAD waveforms.
-      
-      - **INSTANCE_NOISE_WAVEFORMS_HDF5_PATH**: Path to the INSTANCE dataset's noise waveforms stored in HDF5 format. Ensure this path points to the correct location of your INSTANCE noise waveforms file.
+Open `reproducibility/training.ipynb`. Initial preprocessing takes a few hours; full training (5-fold, three models, both datasets, 20 epochs) takes approximately one day on an NVIDIA RTX 3090 Ti.
 
-      - **INSTANCE_EQ_WAVEFORMS_HDF5_PATH**: Path to the INSTANCE dataset's earthquake waveforms stored in HDF5 format. Ensure this path points to the correct location of your INSTANCE earthquake waveforms file.
+### 4. Test
 
-      - **INSTANCE_NOISE_METADATA_CSV_PATH**: Path to the INSTANCE dataset's noise metadata stored in CSV format. This file contains essential metadata associated with the INSTANCE noise waveforms.
+Open `reproducibility/testing.ipynb`. Uses `kfold_tester` to generate earthquake probabilities and `evaluator` to compute metrics.
 
-      - **INSTANCE_EQ_METADATA_CSV_PATH**: Path to the INSTANCE dataset's earthquake metadata stored in CSV format. This file contains essential metadata associated with the INSTANCE earthquake waveforms.
-    
-   - **PREPROCESSED_DATASET_DIRECTORY**: Directory where preprocessed datasets will be stored. Ensure this directory exists or the application has permissions to create it.
-
-   - **TRAINED_MODELS_DIR**: Directory to store trained machine learning models. Ensure this directory exists or the application has permissions to create it.
-    
-   - **RESULTS_DIR**: Directory to store the classification results. 
-
-### Training the models
-After completing the download and setting adjustment procedures, proceed to the **reproducibility** folder inside the SeismicPurifier 
-directory.
-
-By using **training.ipynb** you can train all available of models on both datasets. At the initial phase of the training, datapreprocessing part may take a while(approximately couple of hours). However, it boost the training procedure significantly. On NVIDIA RTX3090 Ti, all training procedure(5-Fold, three models, whole of two datasets and for 20 epochs) takes approximately a day. 
-
-### Testing the models
-After the training the models, you can test different method performances by using kfold_tester(for obtaining unnormalized earthquake probabilities) and evaluator. **testing.ipynb** provides a template for the testing procedure. 
-
-## Experimenting with Custom Data.
-If your dataset is compatible with the structure of either INSTANCE or STEAD datasets, you can use all machinery under the folder **reproducibility**. Or, a different option could be converting your data
-into STEAD dataset format by using [QuakeLabeler](https://maihao14.github.io/QuakeLabeler/) or [SeisBench](https://github.com/seisbench/seisbench).
-
-For other types of data, it's possible to feed numpy arrays directly for training. **SeismicPurifier/model_train.ipynb** provides example for this case. You can also test your data as well. Please 
-check **SeismicPurifier/model_test.ipynb**. For training and testing, pretrained models are stored in **SeismicPurifier/models** folder. Besides, **SeismicPurifier/data** involves small dataset
-for experimenting. 
+---
 
 ## License
+
 This project is licensed under the MIT License.
 
 ## Contact
-For any questions, issues, or feature requests, please open an issue on the GitHub repository contact onur.efe44@gmail.com.
+
+For questions, issues, or feature requests, open an issue on GitHub or contact onur.efe44@gmail.com.

@@ -18,16 +18,22 @@ setup(
     packages=find_packages(),
     install_requires=[
         'tensorflow==2.14.0',
-        'numpy==1.26.0',
+        'numpy>=1.26.0,<2.0',
         'pandas',
-        'scipy'
+        'scipy',
+        'matplotlib',
+        'h5py',
+        'scikit-learn',
+        'obspy',
+        'pymysql',
+        'seaborn',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',  # Change if using a different license
         'Operating System :: OS Independent',
     ],
-    python_requires='==3.10',
+    python_requires='==3.10.*',
     include_package_data=True,
     entry_points={
     },
